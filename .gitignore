@@ -47,3 +47,6 @@ results/
 
 # Example files (keep inputexample, but ignore output)
 outputexcel/
+
+# Windows packaging
+LocalBlast_Windows*/

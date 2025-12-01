@@ -37,6 +37,13 @@ sudo yum install ncbi-blast+
 ```
 
 #### Windows
+**推荐：使用自动安装脚本**
+1. 下载项目文件
+2. 双击运行 `install_windows.bat`（会自动检查并安装依赖）
+3. 双击运行 `start_windows.bat` 启动程序
+4. 详细说明请查看 [WINDOWS_INSTALL.md](WINDOWS_INSTALL.md)
+
+**手动安装：**
 从NCBI官网下载安装包：
 https://blast.ncbi.nlm.nih.gov/Blast.cgi?CMD=Web&PAGE_TYPE=BlastDocs&DOC_TYPE=Download
 
