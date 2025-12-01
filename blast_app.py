@@ -214,10 +214,8 @@ def generate_html_result(query_sequence, subject_info, blast_results, is_best_ma
     subject_length = subject_info.get('length', 0)
     subject_id = f"lcl|Query_{subject_info.get('id', 0)} (dna)"
     
-    # 如果是最佳匹配，在描述中添加提示
-    subject_description = subject_info.get('name', 'None')
-    if is_best_match:
-        subject_description = f"{subject_description} (最佳匹配)"
+    # Subject Descr 始终显示 None
+    subject_description = 'None'
     
     # 计算最佳匹配结果
     best_result = None
@@ -268,9 +266,10 @@ def generate_html_result(query_sequence, subject_info, blast_results, is_best_ma
       text-decoration: underline;
     }}
     .blast-container {{
-      max-width: 1400px;
-      border: 1px solid #d0d0d0;
-      border-radius: 2px;
+      max-width: 1100px;
+      margin: 0 auto;
+      border: none;
+      border-radius: 0;
       padding: 12px 16px 20px;
     }}
     .summary-table {{
@@ -282,6 +281,9 @@ def generate_html_result(query_sequence, subject_info, blast_results, is_best_ma
       padding: 4px 6px;
       vertical-align: middle;
     }}
+    .summary-table tr {{
+      position: relative;
+    }}
     .summary-table td.label {{
       width: 120px;
       color: #555;
@@ -291,6 +293,14 @@ def generate_html_result(query_sequence, subject_info, blast_results, is_best_ma
       color: #000;
     }}
     .summary-table tr + tr td {{
+      border-top: none;
+    }}
+    .summary-table tr + tr::before {{
+      content: "";
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 50%;
       border-top: 1px solid #e4e4e4;
     }}
     .inline-help {{
@@ -311,7 +321,7 @@ def generate_html_result(query_sequence, subject_info, blast_results, is_best_ma
       cursor: pointer;
     }}
     .tabs {{
-      border-bottom: 1px solid #ccc;
+      border-bottom: 2px solid #0272BD;
       margin: 0 -16px 0;
       padding: 0 16px;
       display: flex;
@@ -372,6 +382,7 @@ def generate_html_result(query_sequence, subject_info, blast_results, is_best_ma
       gap: 4px;
       cursor: default;
       color: #000000;
+      font-weight: bold;
     }}
     .dropdown-label::after {{
       content: "▼";
@@ -407,9 +418,19 @@ def generate_html_result(query_sequence, subject_info, blast_results, is_best_ma
       border-top: none;
       display: flex;
       align-items: center;
+      justify-content: space-between;
       gap: 6px;
       background: #f7f9fb;
       font-size: 13px;
+    }}
+    .select-all-row-right {{
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }}
+    .select-all-row-right a {{
+      color: #000000;
+      text-decoration: underline;
     }}
     .select-all-row span.count {{
       margin-left: 8px;
@@ -434,23 +455,30 @@ def generate_html_result(query_sequence, subject_info, blast_results, is_best_ma
     }}
     table.result-table th {{
       background: #E2F4F8;
-      font-weight: bold;
+      font-weight: normal;
       color: #00538A;
       position: relative;
       white-space: normal;
       word-wrap: break-word;
       line-height: 1.3;
+      text-align: center;
     }}
     table.result-table td {{
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
+      text-align: center;
     }}
     table.result-table th::after {{
       content: "▼";
+      display: block;
       font-size: 9px;
-      margin-left: 4px;
+      margin-top: 2px;
       opacity: 0.5;
+      text-align: center;
+    }}
+    table.result-table th.col-checkbox::after {{
+      content: none;
     }}
     table.result-table tr:nth-child(even) td {{
       background: #fafbff;
@@ -467,11 +495,11 @@ def generate_html_result(query_sequence, subject_info, blast_results, is_best_ma
     }}
     table.result-table .col-small {{
       width: 70px;
-      text-align: right;
+      text-align: center;
     }}
     table.result-table .col-evalue {{
       width: 80px;
-      text-align: left;
+      text-align: center;
     }}
     table.result-table .col-accession {{
       width: 110px;
@@ -556,15 +584,19 @@ def generate_html_result(query_sequence, subject_info, blast_results, is_best_ma
           </select>
         </span>
         <span class="help-circle-small">?</span>
-        <a href="#">Graphics</a>
-        <a href="#">MSA Viewer</a>
       </div>
     </div>
 
     <div class="select-all-row">
-      <input type="checkbox" checked>
-      <span>select all</span>
-      <span class="count">{len(blast_results)} sequences selected</span>
+      <div>
+        <input type="checkbox" checked>
+        <span>select all</span>
+        <span class="count">{len(blast_results)} sequences selected</span>
+      </div>
+      <div class="select-all-row-right">
+        <a href="#">Graphics</a>
+        <a href="#">MSA Viewer</a>
+      </div>
     </div>
 
     <div class="result-table-wrapper">

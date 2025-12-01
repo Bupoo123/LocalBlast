@@ -104,14 +104,19 @@
 </head>
 <body>
     <div class="container">
-        <h1>本地化BLAST工具 - 序列比对</h1>
+        <h1><a href="/manual" style="color: #0272BD; text-decoration: none; cursor: pointer;" title="点击查看用户手册">本地化BLAST工具 - 序列比对</a></h1>
+        
+        <div style="text-align: right; margin-bottom: 20px;">
+            <a href="/batch" style="color: #0272BD; text-decoration: underline;">📦 批量上传比对</a>
+        </div>
         
             <div class="info">
             <strong>使用说明：</strong><br>
             1. 在下方输入框中粘贴您的查询序列（DNA序列，支持FASTA格式）<br>
             2. 从下拉菜单中选择要比对的物种（可选，不选择则与所有物种比对，显示得分最高的结果）<br>
             3. 点击"执行BLAST比对"按钮<br>
-            4. 结果将在新窗口中显示
+            4. 结果将在新窗口中显示<br>
+            <strong>提示：</strong>需要批量处理多个文件？请使用 <a href="/batch" style="color: #0272BD;">批量上传功能</a>
         </div>
 
         <form id="blastForm">
