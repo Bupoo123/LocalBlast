@@ -39,3 +39,11 @@ tmp/
 *.phr
 *.pin
 *.psq
+
+# Upload and result files
+uploads/
+results/
+*.zip
+
+# Example files (keep inputexample, but ignore output)
+outputexcel/
