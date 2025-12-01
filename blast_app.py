@@ -321,7 +321,7 @@ def generate_html_result(query_sequence, subject_info, blast_results, is_best_ma
       cursor: pointer;
     }}
     .tabs {{
-      border-bottom: 2px solid #0272BD;
+      border-bottom: none;
       margin: 0 -16px 0;
       padding: 0 16px;
       display: flex;
@@ -331,7 +331,7 @@ def generate_html_result(query_sequence, subject_info, blast_results, is_best_ma
       padding: 8px 14px;
       border: 1px solid #ccc;
       border-bottom: none;
-      border-radius: 4px 4px 0 0;
+      border-radius: 0;
       background: #f3f3f3;
       color: #000000;
       font-size: 13px;
@@ -342,17 +342,18 @@ def generate_html_result(query_sequence, subject_info, blast_results, is_best_ma
       color: #ffffff;
       font-weight: bold;
       border: 1px solid #ccc;
-      border-bottom: 1px solid #ffffff;
-      border-radius: 4px 4px 0 0;
+      border-bottom: none;
+      border-radius: 0;
     }}
     .main-panel {{
       border-top: none;
       margin-top: 0;
     }}
     .section-header {{
-      margin-top: 12px;
+      margin-top: 0;
       background: #BDD9D6;
       border: 1px solid #3a7ba5;
+      border-top: 3px solid #0272BD;
       padding: 6px 10px;
       display: flex;
       align-items: center;
