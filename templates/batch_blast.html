@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LocalBlast - 批量序列比对</title>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+        body {
+            font-family: Arial, Helvetica, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #0272BD;
+            margin-bottom: 30px;
+        }
+        .info {
+            background: #e3edf5;
+            padding: 15px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+            font-size: 13px;
+            color: #555;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: bold;
+            color: #333;
+        }
+        .file-upload-area {
+            border: 2px dashed #0272BD;
+            border-radius: 4px;
+            padding: 40px;
+            text-align: center;
+            background: #f9f9f9;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .file-upload-area:hover {
+            background: #f0f0f0;
+            border-color: #025a9a;
+        }
+        .file-upload-area.dragover {
+            background: #e3edf5;
+            border-color: #0272BD;
+        }
+        input[type="file"] {
+            display: none;
+        }
+        .file-list {
+            margin-top: 20px;
+            max-height: 200px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 10px;
+        }
+        .file-item {
+            padding: 8px;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .file-item:last-child {
+            border-bottom: none;
+        }
+        .file-name {
+            flex: 1;
+        }
+        .file-size {
+            color: #666;
+            font-size: 12px;
+            margin-left: 10px;
+        }
+        .remove-file {
+            color: #c33;
+            cursor: pointer;
+            padding: 4px 8px;
+        }
+        .remove-file:hover {
+            background: #fee;
+            border-radius: 3px;
+        }
+        button {
+            background: #0272BD;
+            color: white;
+            padding: 12px 30px;
+            border: none;
+            border-radius: 4px;
+            font-size: 16px;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+        button:hover {
+            background: #025a9a;
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .error {
+            background: #fee;
+            color: #c33;
+            padding: 15px;
+            border-radius: 4px;
+            margin-top: 20px;
+            display: none;
+        }
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 20px;
+            color: #0272BD;
+        }
+        .progress {
+            margin-top: 20px;
+            display: none;
+        }
+        .progress-bar {
+            width: 100%;
+            height: 30px;
+            background: #f0f0f0;
+            border-radius: 15px;
+            overflow: hidden;
+            margin-bottom: 10px;
+        }
+        .progress-fill {
+            height: 100%;
+            background: #0272BD;
+            width: 0%;
+            transition: width 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 12px;
+        }
+        .results-summary {
+            margin-top: 20px;
+            padding: 15px;
+            background: #e3edf5;
+            border-radius: 4px;
+            display: none;
+        }
+        .download-btn {
+            background: #10b981;
+            margin-top: 10px;
+        }
+        .download-btn:hover {
+            background: #059669;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1><a href="/manual" style="color: #0272BD; text-decoration: none; cursor: pointer;" title="点击查看用户手册">LocalBlast - 批量序列比对</a></h1>
+        
+        <div class="info">
+            <strong>使用说明：</strong><br>
+            1. 点击下方区域或拖拽文件上传多个.seq格式的序列文件<br>
+            2. 系统将自动与所有物种进行比对，找出每个文件的最佳匹配<br>
+            3. 处理完成后可以打包下载所有结果图片<br>
+            4. 支持的文件格式：.seq（每行一个序列片段）
+        </div>
+
+        <form id="batchForm">
+            <div class="form-group">
+                <label>上传序列文件（.seq格式）:</label>
+                <div class="file-upload-area" id="uploadArea">
+                    <p>点击选择文件或拖拽文件到此处</p>
+                    <p style="font-size: 12px; color: #666;">支持多文件上传，文件格式：.seq</p>
+                    <input type="file" id="fileInput" multiple accept=".seq">
+                </div>
+                <div class="file-list" id="fileList" style="display: none;"></div>
+            </div>
+
+            <button type="submit" id="submitBtn" disabled>开始批量比对</button>
+        </form>
+
+        <div class="error" id="errorMsg"></div>
+        <div class="loading" id="loadingMsg">正在处理，请稍候...</div>
+
+        <div class="progress" id="progressContainer">
+            <div class="progress-bar">
+                <div class="progress-fill" id="progressFill">0%</div>
+            </div>
+            <div id="progressText">准备中...</div>
+        </div>
+
+        <div class="results-summary" id="resultsSummary">
+            <h3>处理完成</h3>
+            <div id="resultsInfo"></div>
+            <button class="download-btn" id="downloadBtn">下载所有结果图片（ZIP）</button>
+        </div>
+    </div>
+
+    <script>
+        const uploadArea = document.getElementById('uploadArea');
+        const fileInput = document.getElementById('fileInput');
+        const fileList = document.getElementById('fileList');
+        const submitBtn = document.getElementById('submitBtn');
+        const batchForm = document.getElementById('batchForm');
+        let selectedFiles = [];
+
+        // 点击上传区域
+        uploadArea.addEventListener('click', () => fileInput.click());
+
+        // 文件选择
+        fileInput.addEventListener('change', (e) => {
+            handleFiles(Array.from(e.target.files));
+        });
+
+        // 拖拽上传
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('dragover');
+        });
+
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.classList.remove('dragover');
+        });
+
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+            handleFiles(Array.from(e.dataTransfer.files));
+        });
+
+        function handleFiles(files) {
+            files.forEach(file => {
+                if (file.name.endsWith('.seq')) {
+                    if (!selectedFiles.find(f => f.name === file.name && f.size === file.size)) {
+                        selectedFiles.push(file);
+                    }
+                }
+            });
+            updateFileList();
+        }
+
+        function updateFileList() {
+            if (selectedFiles.length === 0) {
+                fileList.style.display = 'none';
+                submitBtn.disabled = true;
+                return;
+            }
+
+            fileList.style.display = 'block';
+            fileList.innerHTML = selectedFiles.map((file, index) => `
+                <div class="file-item">
+                    <span class="file-name">${file.name}</span>
+                    <span class="file-size">${(file.size / 1024).toFixed(2)} KB</span>
+                    <span class="remove-file" onclick="removeFile(${index})">×</span>
+                </div>
+            `).join('');
+            submitBtn.disabled = false;
+        }
+
+        function removeFile(index) {
+            selectedFiles.splice(index, 1);
+            updateFileList();
+        }
+
+        // 提交表单
+        batchForm.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            if (selectedFiles.length === 0) {
+                showError('请至少选择一个文件');
+                return;
+            }
+
+            const formData = new FormData();
+            selectedFiles.forEach(file => {
+                formData.append('files', file);
+            });
+
+            submitBtn.disabled = true;
+            document.getElementById('errorMsg').style.display = 'none';
+            document.getElementById('loadingMsg').style.display = 'block';
+            document.getElementById('progressContainer').style.display = 'block';
+            document.getElementById('resultsSummary').style.display = 'none';
+
+            try {
+                const response = await fetch('/api/batch-blast', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.error || '批量比对失败');
+                }
+
+                // 显示结果
+                document.getElementById('loadingMsg').style.display = 'none';
+                document.getElementById('progressContainer').style.display = 'none';
+                document.getElementById('resultsSummary').style.display = 'block';
+                document.getElementById('resultsInfo').innerHTML = `
+                    <p>成功处理 ${data.processed} 个文件</p>
+                    <p>结果文件已准备就绪，点击下方按钮下载</p>
+                `;
+
+                // 保存下载链接
+                document.getElementById('downloadBtn').onclick = () => {
+                    window.location.href = `/api/download-results?batch_id=${data.batch_id}`;
+                };
+
+            } catch (error) {
+                showError(error.message);
+                document.getElementById('loadingMsg').style.display = 'none';
+                document.getElementById('progressContainer').style.display = 'none';
+            } finally {
+                submitBtn.disabled = false;
+            }
+        });
+
+        function showError(message) {
+            const errorMsg = document.getElementById('errorMsg');
+            errorMsg.textContent = message;
+            errorMsg.style.display = 'block';
+        }
+
+        // 更新进度（可以通过WebSocket或轮询实现）
+        function updateProgress(current, total) {
+            const percentage = Math.round((current / total) * 100);
+            document.getElementById('progressFill').style.width = percentage + '%';
+            document.getElementById('progressFill').textContent = percentage + '%';
+            document.getElementById('progressText').textContent = `处理中: ${current}/${total}`;
+        }
+    </script>
+</body>
+</html>

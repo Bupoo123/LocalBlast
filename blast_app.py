@@ -11,12 +11,25 @@ import json
 import subprocess
 import tempfile
 import shutil
+import zipfile
+import uuid
+from datetime import datetime
 from flask import Flask, render_template, request, jsonify, send_file
 from flask_cors import CORS
 import re
+from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
 CORS(app)
+
+# 配置
+UPLOAD_FOLDER = 'uploads'
+RESULTS_FOLDER = 'results'
+ALLOWED_EXTENSIONS = {'seq'}
+
+# 确保文件夹存在
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+os.makedirs(RESULTS_FOLDER, exist_ok=True)
 
 # 加载物种数据库
 SPECIES_DB_FILE = 'species_db.json'
@@ -72,6 +85,80 @@ def parse_blast_output(blast_output):
             results.append(result)
     
     return results
+
+def run_blastn_against_all_species(query_sequence):
+    """使用统一数据库与所有物种比对（优化版本）"""
+    # 创建临时目录
+    temp_dir = tempfile.mkdtemp()
+    
+    try:
+        # 写入查询序列
+        query_file = os.path.join(temp_dir, 'query.fasta')
+        with open(query_file, 'w') as f:
+            f.write(f">Query\n{query_sequence}\n")
+        
+        # 创建包含所有物种序列的统一FASTA文件
+        # 序列ID格式：species_id|species_name，这样可以从结果中识别物种
+        all_species_file = os.path.join(temp_dir, 'all_species.fasta')
+        with open(all_species_file, 'w') as f:
+            for species in SPECIES_DB:
+                # 序列ID格式：species_id|species_name
+                seq_id = f"{species['id']}|{species['name']}"
+                f.write(f">{seq_id}\n{species['sequence']}\n")
+        
+        # 创建统一的BLAST数据库（只创建一次）
+        db_file = os.path.join(temp_dir, 'all_species_db')
+        subprocess.run(['makeblastdb', '-in', all_species_file, 
+                      '-dbtype', 'nucl', '-out', db_file],
+                     check=True, capture_output=True)
+        
+        # 执行blastn比对（只执行一次）
+        output_file = os.path.join(temp_dir, 'blast_output.txt')
+        cmd = [
+            'blastn',
+            '-query', query_file,
+            '-db', db_file,
+            '-outfmt', '6 qseqid sseqid pident length mismatch gapopen qstart qend sstart send evalue bitscore',
+            '-out', output_file,
+            '-max_target_seqs', '100'  # 限制结果数量以提高速度
+        ]
+        
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
+        
+        if result.returncode != 0:
+            raise Exception(f"BLAST执行失败: {result.stderr}")
+        
+        # 读取结果
+        with open(output_file, 'r') as f:
+            output = f.read()
+        
+        # 解析结果
+        blast_results = parse_blast_output(output)
+        
+        # 为每个结果添加物种信息
+        all_results = []
+        for result in blast_results:
+            # 从subject_id中解析物种ID和名称
+            # 格式：species_id|species_name
+            subject_id = result['subject_id']
+            if '|' in subject_id:
+                species_id_str, species_name = subject_id.split('|', 1)
+                try:
+                    species_id = int(species_id_str)
+                    # 查找对应的物种信息
+                    for species in SPECIES_DB:
+                        if species['id'] == species_id:
+                            result['species_info'] = species
+                            all_results.append(result)
+                            break
+                except ValueError:
+                    continue
+        
+        return all_results
+    
+    finally:
+        # 清理临时文件
+        shutil.rmtree(temp_dir, ignore_errors=True)
 
 def run_blastn(query_sequence, subject_sequence, subject_name):
     """执行blastn比对"""
@@ -544,10 +631,57 @@ def generate_html_result(query_sequence, subject_info, blast_results, is_best_ma
     
     return html_template
 
+def parse_seq_file(file_content):
+    """解析.seq文件内容，返回序列字符串"""
+    # 移除所有空白字符和换行，只保留序列字符
+    # .seq文件可能包含数字行号，需要过滤掉
+    lines = file_content.strip().split('\n')
+    sequence = ''
+    
+    for line in lines:
+        line = line.strip()
+        # 跳过空行和纯数字行（行号）
+        if not line or line.isdigit():
+            continue
+        # 移除行号（如果行首是数字）
+        if line and line[0].isdigit():
+            # 尝试找到第一个非数字字符
+            for i, char in enumerate(line):
+                if not char.isdigit() and char not in ' \t':
+                    line = line[i:]
+                    break
+        
+        # 提取序列字符（只保留ATCG和可能的模糊字符）
+        seq_chars = ''.join([c for c in line.upper() if c in 'ATCGNMRWSYKVHDBNX-'])
+        sequence += seq_chars
+    
+    # 移除所有非标准字符，只保留ATCG
+    sequence = re.sub(r'[^ATCG]', '', sequence.upper())
+    return sequence
+
+def html_to_image(html_content, output_path):
+    """将HTML内容转换为图片（简化版本：先保存为HTML，后续可用selenium转换）"""
+    # 暂时先保存为HTML文件，后续可以添加selenium转换
+    with open(output_path.replace('.png', '.html'), 'w', encoding='utf-8') as f:
+        f.write(html_content)
+    # TODO: 使用selenium或playwright将HTML转为图片
+    # 暂时返回HTML文件路径
+    return output_path.replace('.png', '.html')
+
 @app.route('/')
 def index():
     """主页面"""
     return render_template('blast_input.html', species_list=SPECIES_DB)
+
+@app.route('/batch')
+def batch_page():
+    """批量比对页面"""
+    return render_template('batch_blast.html')
+
+@app.route('/manual')
+def user_manual():
+    """用户手册页面"""
+    return render_template('user_manual.html')
 
 @app.route('/api/species', methods=['GET'])
 def get_species():
@@ -596,55 +730,150 @@ def run_blast():
                 'results_count': len(blast_results)
             })
         else:
-            # 与所有物种比对，找出得分最高的
-            all_results = []
-            
-            for species in SPECIES_DB:
-                try:
-                    blast_results = run_blastn(
-                        query_sequence,
-                        species['sequence'],
-                        species['name']
-                    )
-                    
-                    # 为每个结果添加物种信息
-                    for result in blast_results:
-                        result['species_info'] = species
-                        all_results.append(result)
+            # 与所有物种比对，使用统一数据库（优化版本）
+            try:
+                # 使用统一数据库进行比对
+                all_results = run_blastn_against_all_species(query_sequence)
                 
-                except Exception as e:
-                    # 如果某个物种比对失败，继续下一个
-                    print(f"物种 {species['name']} 比对失败: {str(e)}")
-                    continue
-            
-            if not all_results:
-                return jsonify({'error': '未找到任何匹配结果'}), 404
-            
-            # 按bitscore排序，选择得分最高的
-            all_results.sort(key=lambda x: x['bitscore'], reverse=True)
-            best_result = all_results[0]
-            best_species = best_result['species_info']
-            
-            # 只返回最佳匹配结果
-            best_blast_results = [best_result]
-            
-            # 生成HTML结果（标记为最佳匹配）
-            html_result = generate_html_result(query_sequence, best_species, best_blast_results, is_best_match=True)
-            
-            return jsonify({
-                'success': True,
-                'html': html_result,
-                'results_count': 1,
-                'best_match': {
-                    'species_name': best_species['name'],
-                    'bitscore': best_result['bitscore'],
-                    'identity': best_result['identity'],
-                    'evalue': best_result['evalue']
-                }
-            })
+                if not all_results:
+                    return jsonify({'error': '未找到任何匹配结果'}), 404
+                
+                # 按bitscore排序，选择得分最高的
+                all_results.sort(key=lambda x: x['bitscore'], reverse=True)
+                best_result = all_results[0]
+                best_species = best_result['species_info']
+                
+                # 只返回最佳匹配结果
+                best_blast_results = [best_result]
+                
+                # 生成HTML结果（标记为最佳匹配）
+                html_result = generate_html_result(query_sequence, best_species, best_blast_results, is_best_match=True)
+                
+                return jsonify({
+                    'success': True,
+                    'html': html_result,
+                    'results_count': 1,
+                    'best_match': {
+                        'species_name': best_species['name'],
+                        'bitscore': best_result['bitscore'],
+                        'identity': best_result['identity'],
+                        'evalue': best_result['evalue']
+                    }
+                })
+            except Exception as e:
+                return jsonify({'error': f'统一数据库比对失败: {str(e)}'}), 500
     
     except Exception as e:
         return jsonify({'error': f'BLAST执行失败: {str(e)}'}), 500
+
+@app.route('/api/batch-blast', methods=['POST'])
+def batch_blast():
+    """批量处理序列文件"""
+    if 'files' not in request.files:
+        return jsonify({'error': '没有上传文件'}), 400
+    
+    files = request.files.getlist('files')
+    
+    if not files or files[0].filename == '':
+        return jsonify({'error': '请至少选择一个文件'}), 400
+    
+    # 检查BLAST是否安装
+    if not check_blast_installed():
+        return jsonify({'error': 'BLAST+未安装，请先安装BLAST+工具'}), 500
+    
+    # 创建批次ID
+    batch_id = str(uuid.uuid4())
+    batch_folder = os.path.join(RESULTS_FOLDER, batch_id)
+    os.makedirs(batch_folder, exist_ok=True)
+    
+    processed = 0
+    errors = []
+    
+    try:
+        for file in files:
+            if not file.filename.endswith('.seq'):
+                errors.append(f"{file.filename}: 不是.seq格式文件")
+                continue
+            
+            try:
+                # 读取文件内容
+                file_content = file.read().decode('utf-8', errors='ignore')
+                
+                # 解析序列
+                sequence = parse_seq_file(file_content)
+                
+                if not sequence or len(sequence) < 10:
+                    errors.append(f"{file.filename}: 序列太短或无效")
+                    continue
+                
+                # 与所有物种比对（使用统一数据库）
+                all_results = run_blastn_against_all_species(sequence)
+                
+                if not all_results:
+                    errors.append(f"{file.filename}: 未找到匹配结果")
+                    continue
+                
+                # 选择最佳匹配
+                all_results.sort(key=lambda x: x['bitscore'], reverse=True)
+                best_result = all_results[0]
+                best_species = best_result['species_info']
+                best_blast_results = [best_result]
+                
+                # 生成HTML结果
+                html_result = generate_html_result(sequence, best_species, best_blast_results, is_best_match=True)
+                
+                # 保存HTML文件
+                safe_filename = secure_filename(file.filename)
+                html_filename = safe_filename.replace('.seq', '.html')
+                html_path = os.path.join(batch_folder, html_filename)
+                with open(html_path, 'w', encoding='utf-8') as f:
+                    f.write(html_result)
+                
+                processed += 1
+                
+            except Exception as e:
+                errors.append(f"{file.filename}: {str(e)}")
+                continue
+        
+        if processed == 0:
+            return jsonify({'error': '没有成功处理任何文件', 'errors': errors}), 400
+        
+        return jsonify({
+            'success': True,
+            'batch_id': batch_id,
+            'processed': processed,
+            'total': len(files),
+            'errors': errors
+        })
+    
+    except Exception as e:
+        return jsonify({'error': f'批量处理失败: {str(e)}'}), 500
+
+@app.route('/api/download-results', methods=['GET'])
+def download_results():
+    """下载批量处理结果"""
+    batch_id = request.args.get('batch_id')
+    
+    if not batch_id:
+        return jsonify({'error': '缺少batch_id参数'}), 400
+    
+    batch_folder = os.path.join(RESULTS_FOLDER, batch_id)
+    
+    if not os.path.exists(batch_folder):
+        return jsonify({'error': '结果文件不存在'}), 404
+    
+    # 创建ZIP文件
+    zip_filename = f'blast_results_{batch_id}.zip'
+    zip_path = os.path.join(RESULTS_FOLDER, zip_filename)
+    
+    with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+        for root, dirs, files in os.walk(batch_folder):
+            for file in files:
+                file_path = os.path.join(root, file)
+                arcname = os.path.relpath(file_path, batch_folder)
+                zipf.write(file_path, arcname)
+    
+    return send_file(zip_path, as_attachment=True, download_name=zip_filename)
 
 if __name__ == '__main__':
     load_species_db()

@@ -1,0 +1,364 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>BLAST Result</title>
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+    body {
+      margin: 0;
+      padding: 16px;
+      font-family: Arial, Helvetica, sans-serif;
+      font-size: 13px;
+      color: #222;
+      background: #ffffff;
+    }
+    a {
+      color: #1763a6;
+      text-decoration: none;
+    }
+    a:hover {
+      text-decoration: underline;
+    }
+    .blast-container {
+      max-width: 1400px;
+      border: 1px solid #d0d0d0;
+      border-radius: 2px;
+      padding: 12px 16px 20px;
+    }
+    .summary-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 12px;
+    }
+    .summary-table td {
+      padding: 4px 6px;
+      vertical-align: middle;
+    }
+    .summary-table td.label {
+      width: 120px;
+      color: #555;
+      font-weight: bold;
+    }
+    .summary-table td.value {
+      color: #000;
+    }
+    .summary-table tr + tr td {
+      border-top: 1px solid #e4e4e4;
+    }
+    .inline-help {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .help-icon {
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: #2b6cb0;
+      color: #fff;
+      font-size: 11px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+    }
+    .tabs {
+      border-bottom: 1px solid #ccc;
+      margin: 0 -16px 0;
+      padding: 0 16px;
+      display: flex;
+      gap: 8px;
+    }
+    .tab {
+      padding: 8px 14px;
+      border: 1px solid #ccc;
+      border-bottom: none;
+      border-radius: 4px 4px 0 0;
+      background: #f3f3f3;
+      color: #000000;
+      font-size: 13px;
+      cursor: pointer;
+    }
+    .tabs .tab.active {
+      background-color: #0272BD;
+      color: #ffffff;
+      font-weight: bold;
+      border: 1px solid #ccc;
+      border-bottom: 1px solid #ffffff;
+      border-radius: 4px 4px 0 0;
+    }
+    .main-panel {
+      border-top: none;
+      margin-top: 0;
+    }
+    .section-header {
+      margin-top: 12px;
+      background: #BDD9D6;
+      border: 1px solid #3a7ba5;
+      padding: 6px 10px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 14px;
+      font-weight: bold;
+      color: #000000;
+    }
+    .section-header-left {
+      flex: 1;
+    }
+    .section-header-right {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      font-size: 12px;
+      font-weight: normal;
+      color: #000000;
+    }
+    .section-header-right a {
+      color: #000000;
+      text-decoration: underline;
+    }
+    .dropdown-label {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      cursor: default;
+      color: #000000;
+    }
+    .dropdown-label::after {
+      content: "▼";
+      font-size: 9px;
+      margin-top: 1px;
+    }
+    .show-select-group {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      color: #ffffff;
+    }
+    select {
+      font-size: 12px;
+      padding: 2px 4px;
+    }
+    .help-circle-small {
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: #ffffff;
+      color: #BDD9D6;
+      font-size: 10px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      font-weight: bold;
+    }
+    .select-all-row {
+      padding: 8px 10px;
+      border: 1px solid #3a7ba5;
+      border-top: none;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: #f7f9fb;
+      font-size: 13px;
+    }
+    .select-all-row span.count {
+      margin-left: 8px;
+      color: #555;
+      font-style: italic;
+    }
+    .result-table-wrapper {
+      border: 1px solid #3a7ba5;
+      border-top: none;
+    }
+    table.result-table {
+      width: 100%;
+      border-collapse: collapse;
+      table-layout: fixed;
+      font-size: 12px;
+    }
+    table.result-table th,
+    table.result-table td {
+      border-top: 1px solid #e0e6ef;
+      padding: 6px 6px;
+      text-align: left;
+    }
+    table.result-table th {
+      background: #E2F4F8;
+      font-weight: bold;
+      color: #00538A;
+      position: relative;
+      white-space: normal;
+      word-wrap: break-word;
+      line-height: 1.3;
+    }
+    table.result-table td {
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    table.result-table th::after {
+      content: "▼";
+      font-size: 9px;
+      margin-left: 4px;
+      opacity: 0.5;
+    }
+    table.result-table tr:nth-child(even) td {
+      background: #fafbff;
+    }
+    table.result-table .col-checkbox {
+      width: 32px;
+      text-align: center;
+    }
+    table.result-table .col-description {
+      width: 260px;
+    }
+    table.result-table .col-scientific {
+      width: 220px;
+    }
+    table.result-table .col-small {
+      width: 70px;
+      text-align: right;
+    }
+    table.result-table .col-evalue {
+      width: 80px;
+      text-align: left;
+    }
+    table.result-table .col-accession {
+      width: 110px;
+    }
+    /* 允许特定列换行显示 */
+    table.result-table th.col-small,
+    table.result-table th.col-evalue,
+    table.result-table th.col-accession,
+    table.result-table td.col-small,
+    table.result-table td.col-evalue,
+    table.result-table td.col-accession {
+      white-space: normal;
+      word-wrap: break-word;
+      overflow: visible;
+      text-overflow: clip;
+      line-height: 1.3;
+    }
+    .link-blue {
+      color: #1763a6;
+      text-decoration: none;
+    }
+    .link-blue:hover {
+      text-decoration: underline;
+    }
+    .value-highlight {
+      color: #004a99;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+<div class="blast-container">
+  <table class="summary-table">
+    <tr>
+      <td class="label">Query Length</td>
+      <td class="value">166</td>
+    </tr>
+    <tr>
+      <td class="label">Subject ID</td>
+      <td class="value">lcl|Query_74 (dna)</td>
+    </tr>
+    <tr>
+      <td class="label">Subject Descr</td>
+      <td class="value">流感嗜血杆菌 (最佳匹配)</td>
+    </tr>
+    <tr>
+      <td class="label">Subject Length</td>
+      <td class="value">201</td>
+    </tr>
+    <tr>
+      <td class="label">Other reports</td>
+      <td class="value">
+        <span class="inline-help">
+          <a href="#">MSA viewer</a>
+          <span class="help-icon">?</span>
+        </span>
+      </td>
+    </tr>
+  </table>
+
+  <div class="tabs">
+    <div class="tab active">Descriptions</div>
+    <div class="tab">Graphic Summary</div>
+    <div class="tab">Alignments</div>
+    <div class="tab">Dot Plot</div>
+  </div>
+
+  <div class="main-panel">
+    <div class="section-header">
+      <div class="section-header-left">
+        Sequences producing significant alignments
+      </div>
+      <div class="section-header-right">
+        <span class="dropdown-label">Download</span>
+        <span class="dropdown-label">Select columns</span>
+        <span class="show-select-group">
+          Show
+          <select>
+            <option>100</option>
+            <option>50</option>
+            <option>20</option>
+          </select>
+        </span>
+        <span class="help-circle-small">?</span>
+        <a href="#">Graphics</a>
+        <a href="#">MSA Viewer</a>
+      </div>
+    </div>
+
+    <div class="select-all-row">
+      <input type="checkbox" checked>
+      <span>select all</span>
+      <span class="count">1 sequences selected</span>
+    </div>
+
+    <div class="result-table-wrapper">
+      <table class="result-table">
+        <thead>
+        <tr>
+          <th class="col-checkbox"></th>
+          <th class="col-description">Description</th>
+          <th class="col-scientific">Scientific Name</th>
+          <th class="col-small">Max<br>Score</th>
+          <th class="col-small">Total<br>Score</th>
+          <th class="col-small">Query<br>Cover</th>
+          <th class="col-evalue">E<br>value</th>
+          <th class="col-small">Per.<br>Ident</th>
+          <th class="col-small">Acc.<br>Len</th>
+          <th class="col-accession">Accession</th>
+        </tr>
+        </thead>
+        <tbody>
+
+        <tr>
+          <td class="col-checkbox"><input type="checkbox" checked></td>
+          <td class="col-description">
+            <a href="#" class="link-blue">流感嗜血杆菌</a>
+          </td>
+          <td class="col-scientific"></td>
+          <td class="col-small">292</td>
+          <td class="col-small">292</td>
+          <td class="col-small">99%</td>
+          <td class="col-evalue">3.81e-82</td>
+          <td class="col-small value-highlight">98.79%</td>
+          <td class="col-small">201</td>
+          <td class="col-accession">Query_74</td>
+        </tr>
+
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+</body>
+</html>
