@@ -13,6 +13,7 @@ import tempfile
 import shutil
 import zipfile
 import uuid
+import csv
 from datetime import datetime
 from flask import Flask, render_template, request, jsonify, send_file
 from flask_cors import CORS
@@ -788,6 +789,7 @@ def batch_blast():
     
     processed = 0
     errors = []
+    summary_rows = []
     
     try:
         for file in files:
@@ -829,6 +831,27 @@ def batch_blast():
                 with open(html_path, 'w', encoding='utf-8') as f:
                     f.write(html_result)
                 
+                query_length = len(sequence)
+                subject_length = best_species.get('length', 0)
+                query_cover_value = 0.0
+                if query_length > 0:
+                    query_cover_value = (best_result['alignment_length'] / query_length) * 100
+                per_ident_value = best_result['identity']
+                positive_probability = (per_ident_value * query_cover_value) / 100
+                result_label = "阳性" if per_ident_value >= 90 else "阴性"
+
+                summary_rows.append([
+                    file.filename,
+                    best_species.get('name', ''),
+                    best_species.get('code', ''),
+                    query_length,
+                    subject_length,
+                    f"{query_cover_value:.2f}%",
+                    f"{per_ident_value:.2f}%",
+                    f"{positive_probability:.2f}%",
+                    result_label
+                ])
+                
                 processed += 1
                 
             except Exception as e:
@@ -837,6 +860,22 @@ def batch_blast():
         
         if processed == 0:
             return jsonify({'error': '没有成功处理任何文件', 'errors': errors}), 400
+        
+        summary_file = os.path.join(batch_folder, 'batch_summary.csv')
+        with open(summary_file, 'w', encoding='utf-8-sig', newline='') as csvfile:
+            writer = csv.writer(csvfile)
+            writer.writerow([
+                'SEQ文件名',
+                '对应参比序列靶点名称',
+                '对应参比序列编号',
+                'Query Length',
+                'Subject Length',
+                'Query Cover',
+                'Per. Ident',
+                '阳性概率值',
+                '结果'
+            ])
+            writer.writerows(summary_rows)
         
         return jsonify({
             'success': True,
