@@ -1,0 +1,80 @@
+name: Create Windows Release Package
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:  # 允许手动触发
+
+jobs:
+  create-package:
+    runs-on: windows-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+      
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+        
+    - name: Create package directory
+      run: |
+        $packageName = "LocalBlast_Windows"
+        $packageDir = "$packageName" + "_" + (Get-Date -Format "yyyyMMdd")
+        New-Item -ItemType Directory -Path $packageDir -Force
+        
+        # Copy core files
+        Copy-Item blast_app.py $packageDir\
+        Copy-Item species_db.json $packageDir\
+        Copy-Item requirements.txt $packageDir\
+        Copy-Item README.md $packageDir\
+        
+        # Copy Windows scripts
+        Copy-Item install_windows.bat $packageDir\
+        Copy-Item start_windows.bat $packageDir\
+        Copy-Item WINDOWS_INSTALL.md $packageDir\
+        Copy-Item "分发说明.md" $packageDir\
+        
+        # Copy templates directory
+        Copy-Item -Recurse templates $packageDir\templates
+        
+        # Copy inputexample if exists
+        if (Test-Path inputexample) {
+          Copy-Item -Recurse inputexample $packageDir\inputexample
+        }
+        
+        # Create installation instructions
+        $instructions = @"
+LocalBlast Windows 安装包
+
+安装步骤：
+1. 确保已安装Python 3.7+（从 https://www.python.org/downloads/ 下载）
+2. 确保已安装BLAST+（从 https://ftp.ncbi.nlm.nih.gov/blast/executables/blast+/LATEST/ 下载）
+3. 双击运行 install_windows.bat 安装依赖
+4. 双击运行 start_windows.bat 启动程序
+5. 在浏览器中访问 http://localhost:5001
+
+详细安装说明请查看 WINDOWS_INSTALL.md
+"@
+        Set-Content -Path "$packageDir\安装说明.txt" -Value $instructions -Encoding UTF8
+        
+        # Create ZIP file
+        Compress-Archive -Path $packageDir -DestinationPath "$packageDir.zip" -Force
+        
+        Write-Host "Package created: $packageDir.zip"
+        
+    - name: Upload package as artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: LocalBlast-Windows-Package
+        path: LocalBlast_Windows_*.zip
+        
+    - name: Upload to release
+      if: github.event_name == 'release'
+      uses: softprops/action-gh-release@v1
+      with:
+        files: LocalBlast_Windows_*.zip
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
