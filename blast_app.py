@@ -273,19 +273,21 @@ def generate_html_result(query_sequence, subject_info, blast_results, is_best_ma
       padding: 12px 16px 20px;
     }}
     .summary-table {{
-      width: 100%;
+      width: 50%;
       border-collapse: collapse;
       margin-bottom: 12px;
+      table-layout: fixed;
     }}
     .summary-table td {{
       padding: 4px 6px;
       vertical-align: middle;
+      text-align: left;
     }}
     .summary-table tr {{
       position: relative;
     }}
     .summary-table td.label {{
-      width: 120px;
+      width: 140px;
       color: #555;
       font-weight: bold;
     }}
@@ -293,14 +295,6 @@ def generate_html_result(query_sequence, subject_info, blast_results, is_best_ma
       color: #000;
     }}
     .summary-table tr + tr td {{
-      border-top: none;
-    }}
-    .summary-table tr + tr::before {{
-      content: "";
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 50%;
       border-top: 1px solid #e4e4e4;
     }}
     .inline-help {{
