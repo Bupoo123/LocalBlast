@@ -106,10 +106,10 @@
     <div class="container">
         <h1>本地化BLAST工具 - 序列比对</h1>
         
-        <div class="info">
+            <div class="info">
             <strong>使用说明：</strong><br>
             1. 在下方输入框中粘贴您的查询序列（DNA序列，支持FASTA格式）<br>
-            2. 从下拉菜单中选择要比对的物种<br>
+            2. 从下拉菜单中选择要比对的物种（可选，不选择则与所有物种比对，显示得分最高的结果）<br>
             3. 点击"执行BLAST比对"按钮<br>
             4. 结果将在新窗口中显示
         </div>
@@ -121,9 +121,9 @@
             </div>
 
             <div class="form-group">
-                <label for="speciesSelect">选择比对物种:</label>
-                <select id="speciesSelect" required>
-                    <option value="">-- 请选择物种 --</option>
+                <label for="speciesSelect">选择比对物种（可选，不选择则与所有物种比对）:</label>
+                <select id="speciesSelect">
+                    <option value="">-- 不选择，与所有物种比对 --</option>
                     {% for species in species_list %}
                     <option value="{{ species.id }}">{{ species.name }} ({{ species.code }})</option>
                     {% endfor %}
@@ -147,7 +147,8 @@
             e.preventDefault();
             
             const querySequence = document.getElementById('querySequence').value.trim();
-            const speciesId = parseInt(document.getElementById('speciesSelect').value);
+            const speciesSelectValue = document.getElementById('speciesSelect').value;
+            const speciesId = speciesSelectValue ? parseInt(speciesSelectValue) : null;
             const submitBtn = document.getElementById('submitBtn');
             const errorMsg = document.getElementById('errorMsg');
             const loadingMsg = document.getElementById('loadingMsg');
@@ -164,11 +165,6 @@
                 return;
             }
             
-            if (!speciesId) {
-                showError('请选择要比对的物种');
-                return;
-            }
-            
             // 清理序列（移除FASTA头部和空白字符）
             let cleanSequence = querySequence.replace(/^>.*$/gm, '').replace(/\s/g, '').toUpperCase();
             
@@ -180,6 +176,11 @@
             
             // 显示加载状态
             submitBtn.disabled = true;
+            if (speciesId) {
+                loadingMsg.textContent = '正在执行BLAST比对，请稍候...';
+            } else {
+                loadingMsg.textContent = '正在与所有物种比对，这可能需要一些时间，请稍候...';
+            }
             loadingMsg.style.display = 'block';
             
             try {

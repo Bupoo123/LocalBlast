@@ -120,11 +120,16 @@ def run_blastn(query_sequence, subject_sequence, subject_name):
         # 清理临时文件
         shutil.rmtree(temp_dir, ignore_errors=True)
 
-def generate_html_result(query_sequence, subject_info, blast_results):
+def generate_html_result(query_sequence, subject_info, blast_results, is_best_match=False):
     """生成HTML结果页面"""
     query_length = len(query_sequence)
     subject_length = subject_info.get('length', 0)
     subject_id = f"lcl|Query_{subject_info.get('id', 0)} (dna)"
+    
+    # 如果是最佳匹配，在描述中添加提示
+    subject_description = subject_info.get('name', 'None')
+    if is_best_match:
+        subject_description = f"{subject_description} (最佳匹配)"
     
     # 计算最佳匹配结果
     best_result = None
@@ -248,7 +253,7 @@ def generate_html_result(query_sequence, subject_info, blast_results):
     }}
     .section-header {{
       margin-top: 12px;
-      background: #4a9bc7;
+      background: #BDD9D6;
       border: 1px solid #3a7ba5;
       padding: 6px 10px;
       display: flex;
@@ -256,7 +261,7 @@ def generate_html_result(query_sequence, subject_info, blast_results):
       justify-content: space-between;
       font-size: 14px;
       font-weight: bold;
-      color: #ffffff;
+      color: #000000;
     }}
     .section-header-left {{
       flex: 1;
@@ -267,10 +272,10 @@ def generate_html_result(query_sequence, subject_info, blast_results):
       gap: 16px;
       font-size: 12px;
       font-weight: normal;
-      color: #ffffff;
+      color: #000000;
     }}
     .section-header-right a {{
-      color: #ffffff;
+      color: #000000;
       text-decoration: underline;
     }}
     .dropdown-label {{
@@ -278,7 +283,7 @@ def generate_html_result(query_sequence, subject_info, blast_results):
       align-items: center;
       gap: 4px;
       cursor: default;
-      color: #ffffff;
+      color: #000000;
     }}
     .dropdown-label::after {{
       content: "▼";
@@ -300,7 +305,7 @@ def generate_html_result(query_sequence, subject_info, blast_results):
       height: 14px;
       border-radius: 50%;
       background: #ffffff;
-      color: #4a9bc7;
+      color: #BDD9D6;
       font-size: 10px;
       display: inline-flex;
       align-items: center;
@@ -338,15 +343,20 @@ def generate_html_result(query_sequence, subject_info, blast_results):
       border-top: 1px solid #e0e6ef;
       padding: 6px 6px;
       text-align: left;
+    }}
+    table.result-table th {{
+      background: #E2F4F8;
+      font-weight: bold;
+      color: #00538A;
+      position: relative;
+      white-space: normal;
+      word-wrap: break-word;
+      line-height: 1.3;
+    }}
+    table.result-table td {{
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
-    }}
-    table.result-table th {{
-      background: #f4f6fb;
-      font-weight: bold;
-      color: #333;
-      position: relative;
     }}
     table.result-table th::after {{
       content: "▼";
@@ -378,6 +388,19 @@ def generate_html_result(query_sequence, subject_info, blast_results):
     table.result-table .col-accession {{
       width: 110px;
     }}
+    /* 允许特定列换行显示 */
+    table.result-table th.col-small,
+    table.result-table th.col-evalue,
+    table.result-table th.col-accession,
+    table.result-table td.col-small,
+    table.result-table td.col-evalue,
+    table.result-table td.col-accession {{
+      white-space: normal;
+      word-wrap: break-word;
+      overflow: visible;
+      text-overflow: clip;
+      line-height: 1.3;
+    }}
     .link-blue {{
       color: #1763a6;
       text-decoration: none;
@@ -404,7 +427,7 @@ def generate_html_result(query_sequence, subject_info, blast_results):
     </tr>
     <tr>
       <td class="label">Subject Descr</td>
-      <td class="value">{subject_info.get('name', 'None')}</td>
+      <td class="value">{subject_description}</td>
     </tr>
     <tr>
       <td class="label">Subject Length</td>
@@ -463,12 +486,12 @@ def generate_html_result(query_sequence, subject_info, blast_results):
           <th class="col-checkbox"></th>
           <th class="col-description">Description</th>
           <th class="col-scientific">Scientific Name</th>
-          <th class="col-small">Max Score</th>
-          <th class="col-small">Total Score</th>
-          <th class="col-small">Query Cover</th>
-          <th class="col-evalue">E value</th>
-          <th class="col-small">Per. Ident</th>
-          <th class="col-small">Acc. Len</th>
+          <th class="col-small">Max<br>Score</th>
+          <th class="col-small">Total<br>Score</th>
+          <th class="col-small">Query<br>Cover</th>
+          <th class="col-evalue">E<br>value</th>
+          <th class="col-small">Per.<br>Ident</th>
+          <th class="col-small">Acc.<br>Len</th>
           <th class="col-accession">Accession</th>
         </tr>
         </thead>
@@ -541,39 +564,84 @@ def run_blast():
     if not query_sequence:
         return jsonify({'error': '查询序列不能为空'}), 400
     
-    if not species_id:
-        return jsonify({'error': '请选择物种'}), 400
-    
-    # 查找物种信息
-    subject_info = None
-    for species in SPECIES_DB:
-        if species['id'] == species_id:
-            subject_info = species
-            break
-    
-    if not subject_info:
-        return jsonify({'error': '未找到指定的物种'}), 404
-    
     # 检查BLAST是否安装
     if not check_blast_installed():
         return jsonify({'error': 'BLAST+未安装，请先安装BLAST+工具'}), 500
     
     try:
-        # 执行BLAST比对
-        blast_results = run_blastn(
-            query_sequence,
-            subject_info['sequence'],
-            subject_info['name']
-        )
-        
-        # 生成HTML结果
-        html_result = generate_html_result(query_sequence, subject_info, blast_results)
-        
-        return jsonify({
-            'success': True,
-            'html': html_result,
-            'results_count': len(blast_results)
-        })
+        if species_id:
+            # 单个物种比对
+            subject_info = None
+            for species in SPECIES_DB:
+                if species['id'] == species_id:
+                    subject_info = species
+                    break
+            
+            if not subject_info:
+                return jsonify({'error': '未找到指定的物种'}), 404
+            
+            # 执行BLAST比对
+            blast_results = run_blastn(
+                query_sequence,
+                subject_info['sequence'],
+                subject_info['name']
+            )
+            
+            # 生成HTML结果
+            html_result = generate_html_result(query_sequence, subject_info, blast_results)
+            
+            return jsonify({
+                'success': True,
+                'html': html_result,
+                'results_count': len(blast_results)
+            })
+        else:
+            # 与所有物种比对，找出得分最高的
+            all_results = []
+            
+            for species in SPECIES_DB:
+                try:
+                    blast_results = run_blastn(
+                        query_sequence,
+                        species['sequence'],
+                        species['name']
+                    )
+                    
+                    # 为每个结果添加物种信息
+                    for result in blast_results:
+                        result['species_info'] = species
+                        all_results.append(result)
+                
+                except Exception as e:
+                    # 如果某个物种比对失败，继续下一个
+                    print(f"物种 {species['name']} 比对失败: {str(e)}")
+                    continue
+            
+            if not all_results:
+                return jsonify({'error': '未找到任何匹配结果'}), 404
+            
+            # 按bitscore排序，选择得分最高的
+            all_results.sort(key=lambda x: x['bitscore'], reverse=True)
+            best_result = all_results[0]
+            best_species = best_result['species_info']
+            
+            # 只返回最佳匹配结果
+            best_blast_results = [best_result]
+            
+            # 生成HTML结果（标记为最佳匹配）
+            html_result = generate_html_result(query_sequence, best_species, best_blast_results, is_best_match=True)
+            
+            return jsonify({
+                'success': True,
+                'html': html_result,
+                'results_count': 1,
+                'best_match': {
+                    'species_name': best_species['name'],
+                    'bitscore': best_result['bitscore'],
+                    'identity': best_result['identity'],
+                    'evalue': best_result['evalue']
+                }
+            })
     
     except Exception as e:
         return jsonify({'error': f'BLAST执行失败: {str(e)}'}), 500
