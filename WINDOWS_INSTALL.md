@@ -22,9 +22,10 @@
    - 按照提示完成安装
 
 3. **启动程序**
-   - 双击运行 `start_windows.bat`
-   - 等待服务启动（会显示"服务地址: http://localhost:5001"）
-   - 在浏览器中打开 http://localhost:5001
+   - 打开命令提示符（CMD）
+   - 切换到项目目录：`cd /d C:\path\to\LocalBlast`
+   - 运行 `python blast_app.py`
+   - 等待显示"服务地址: http://localhost:5001"后，在浏览器中打开 http://localhost:5001
 
 ### 方法二：手动安装
 
@@ -33,7 +34,7 @@
 #### 步骤1：安装Python
 
 1. 访问 https://www.python.org/downloads/
-2. 下载Python 3.7或更高版本（推荐Python 3.9+）
+2. 下载Python 3.7或更高版本（推荐Python 3.8-3.11，与Pillow 10.0.0完全兼容）
 3. **重要**：安装时务必勾选 **"Add Python to PATH"**
 4. 点击"Install Now"完成安装
 5. 验证安装：打开命令提示符（CMD），输入 `python --version`，应该显示Python版本
@@ -68,18 +69,22 @@
 1. 打开命令提示符（CMD）
 2. 切换到项目目录：
    ```cmd
-   cd C:\path\to\LocalBlast
+   cd /d C:\path\to\LocalBlast
    ```
 3. 安装依赖：
    ```cmd
    python -m pip install --upgrade pip
    python -m pip install -r requirements.txt
    ```
+   - 提示：Pillow 10.0.0 与 Python 3.8、3.9、3.10 和 3.11 完全兼容，其他 Python 版本可能安装失败
 
 #### 步骤4：启动程序
 
-1. 双击运行 `start_windows.bat`
-2. 或者使用命令提示符：
+1. 打开命令提示符（CMD）并切换到项目目录：
+   ```cmd
+   cd /d C:\path\to\LocalBlast
+   ```
+2. 运行启动命令：
    ```cmd
    python blast_app.py
    ```
@@ -149,9 +154,9 @@
      ```
    - 注意：BLAST+仍需要单独安装
 
-## 📝 使用说明
+ ## 📝 使用说明
 
-1. **启动程序**：双击 `start_windows.bat`
+1. **启动程序**：打开CMD切换到项目目录并运行 `python blast_app.py`
 2. **打开浏览器**：访问 http://localhost:5001
 3. **单序列比对**：
    - 在"序列输入"页面输入或粘贴序列
