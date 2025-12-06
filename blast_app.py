@@ -213,9 +213,11 @@ def generate_html_result(query_sequence, subject_info, blast_results, is_best_ma
     query_length = len(query_sequence)
     subject_length = subject_info.get('length', 0)
     subject_id = f"lcl|Query_{subject_info.get('id', 0)} (dna)"
+    subject_common_name = subject_info.get('common_name', 'None provided')
+    subject_taxid = subject_info.get('taxid', 'None provided')
     
-    # Subject Descr 始终显示 None
-    subject_description = 'None'
+    # Subject Descr 始终显示 None provided
+    subject_description = 'None provided'
     
     # 计算最佳匹配结果
     best_result = None
@@ -488,6 +490,13 @@ def generate_html_result(query_sequence, subject_info, blast_results, is_best_ma
     table.result-table .col-scientific {{
       width: 220px;
     }}
+    table.result-table .col-common {{
+      width: 220px;
+      white-space: normal;
+    }}
+    table.result-table .col-taxid {{
+      width: 120px;
+    }}
     table.result-table .col-small {{
       width: 70px;
       text-align: center;
@@ -601,6 +610,8 @@ def generate_html_result(query_sequence, subject_info, blast_results, is_best_ma
           <th class="col-checkbox"></th>
           <th class="col-description">Description</th>
           <th class="col-scientific">Scientific Name</th>
+          <th class="col-common">Common Name</th>
+          <th class="col-taxid">Taxid</th>
           <th class="col-small">Max<br>Score</th>
           <th class="col-small">Total<br>Score</th>
           <th class="col-small">Query<br>Cover</th>
@@ -625,10 +636,10 @@ def generate_html_result(query_sequence, subject_info, blast_results, is_best_ma
             html_template += f"""
         <tr>
           <td class="col-checkbox"><input type="checkbox" checked></td>
-          <td class="col-description">
-            <a href="#" class="link-blue">{subject_info.get('name', 'None provided')}</a>
-          </td>
+          <td class="col-description">None provided</td>
           <td class="col-scientific"></td>
+          <td class="col-common">{subject_common_name}</td>
+          <td class="col-taxid">{subject_taxid}</td>
           <td class="col-small">{int(result['bitscore'])}</td>
           <td class="col-small">{int(result['bitscore'])}</td>
           <td class="col-small">{query_cover}%</td>
@@ -641,7 +652,7 @@ def generate_html_result(query_sequence, subject_info, blast_results, is_best_ma
     else:
         html_template += """
         <tr>
-          <td colspan="10" style="text-align: center; padding: 20px; color: #666;">
+          <td colspan="12" style="text-align: center; padding: 20px; color: #666;">
             No significant alignments found.
           </td>
         </tr>
