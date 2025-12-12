@@ -626,7 +626,7 @@ def generate_html_result(query_sequence, subject_info, blast_results, is_best_ma
         <tr>
           <td class="col-checkbox"><input type="checkbox" checked></td>
           <td class="col-description">
-            <a href="#" class="link-blue">{subject_info.get('name', 'None provided')}</a>
+            <a href="#" class="link-blue">None provided</a>
           </td>
           <td class="col-scientific"></td>
           <td class="col-small">{int(result['bitscore'])}</td>

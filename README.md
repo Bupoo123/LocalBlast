@@ -39,8 +39,12 @@ sudo yum install ncbi-blast+
 #### Windows
 **推荐：使用自动安装脚本**
 1. 下载项目文件
-2. 双击运行 `install_windows.bat`（会自动检查并安装依赖）
-3. 双击运行 `start_windows.bat` 启动程序
+2. 双击运行 `install_windows.bat`（会自动检查并安装依赖，Pillow 建议使用 Python 3.8-3.11 以避免兼容性问题）
+3. 打开命令提示符（CMD）切换到项目目录后运行
+   ```cmd
+   cd /d C:\path\to\LocalBlast
+   python blast_app.py
+   ```
 4. 详细说明请查看 [WINDOWS_INSTALL.md](WINDOWS_INSTALL.md)
 
 **手动安装：**
