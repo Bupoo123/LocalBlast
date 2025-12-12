@@ -14,6 +14,7 @@ import shutil
 import zipfile
 import uuid
 import csv
+import random
 from datetime import datetime
 from flask import Flask, render_template, request, jsonify, send_file
 from flask_cors import CORS
@@ -212,7 +213,13 @@ def generate_html_result(query_sequence, subject_info, blast_results, is_best_ma
     """生成HTML结果页面"""
     query_length = len(query_sequence)
     subject_length = subject_info.get('length', 0)
-    subject_id = f"lcl|Query_{subject_info.get('id', 0)} (dna)"
+    
+    # 生成随机7位数Query ID（1-5开头）
+    query_id_first_digit = random.randint(1, 5)
+    query_id_remaining = ''.join([str(random.randint(0, 9)) for _ in range(6)])
+    query_id = f"{query_id_first_digit}{query_id_remaining}"
+    
+    subject_id = f"lcl|Query_{query_id} (dna)"
     
     # Subject Descr 始终显示 None
     subject_description = 'None'
@@ -626,7 +633,7 @@ def generate_html_result(query_sequence, subject_info, blast_results, is_best_ma
         <tr>
           <td class="col-checkbox"><input type="checkbox" checked></td>
           <td class="col-description">
-            <a href="#" class="link-blue">{subject_info.get('name', 'None provided')}</a>
+            <a href="#" class="link-blue">None</a>
           </td>
           <td class="col-scientific"></td>
           <td class="col-small">{int(result['bitscore'])}</td>
@@ -635,7 +642,7 @@ def generate_html_result(query_sequence, subject_info, blast_results, is_best_ma
           <td class="col-evalue">{evalue_str}</td>
           <td class="col-small value-highlight">{result['identity']:.2f}%</td>
           <td class="col-small">{subject_length}</td>
-          <td class="col-accession">Query_{subject_info.get('id', 0)}</td>
+          <td class="col-accession">Query_{query_id}</td>
         </tr>
 """
     else:
