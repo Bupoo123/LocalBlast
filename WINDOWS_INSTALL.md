@@ -20,9 +20,14 @@
    - 双击运行 `install_windows.bat`
    - 脚本会自动检查并安装所需组件
    - 按照提示完成安装
+   - 如果使用 Python 3.8、3.9、3.10 或 3.11 以外的版本，Pillow 可能安装失败，建议优先使用上述版本
 
 3. **启动程序**
-   - 双击运行 `start_windows.bat`
+   - 打开命令提示符（CMD），切换到项目目录
+     ```cmd
+     cd /d C:\path\to\LocalBlast
+     python blast_app.py
+     ```
    - 等待服务启动（会显示"服务地址: http://localhost:5001"）
    - 在浏览器中打开 http://localhost:5001
 
@@ -68,7 +73,7 @@
 1. 打开命令提示符（CMD）
 2. 切换到项目目录：
    ```cmd
-   cd C:\path\to\LocalBlast
+   cd /d C:\path\to\LocalBlast
    ```
 3. 安装依赖：
    ```cmd
@@ -78,8 +83,11 @@
 
 #### 步骤4：启动程序
 
-1. 双击运行 `start_windows.bat`
-2. 或者使用命令提示符：
+1. 打开命令提示符，切换到项目目录（避免直接双击 `start_windows.bat`）
+   ```cmd
+   cd /d C:\path\to\LocalBlast
+   ```
+2. 启动服务：
    ```cmd
    python blast_app.py
    ```
@@ -151,7 +159,7 @@
 
 ## 📝 使用说明
 
-1. **启动程序**：双击 `start_windows.bat`
+1. **启动程序**：在命令提示符中切换到项目目录并运行 `python blast_app.py`
 2. **打开浏览器**：访问 http://localhost:5001
 3. **单序列比对**：
    - 在"序列输入"页面输入或粘贴序列
