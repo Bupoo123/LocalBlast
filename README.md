@@ -66,11 +66,20 @@ blastn -version
 ```
 
 ### 4. 启动服务
+
+**macOS用户（推荐）：**
+- 双击运行 `start_blast.command` 文件即可一键启动
+- 或在终端中运行：`./start_blast.command`
+
+**Linux用户：**
 ```bash
 python3 blast_app.py
 # 或使用启动脚本
 ./start_blast.sh
 ```
+
+**Windows用户：**
+- 双击运行 `start_windows.bat` 文件
 
 ### 5. 访问界面
 打开浏览器访问：**http://localhost:5001**

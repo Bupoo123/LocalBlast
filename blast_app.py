@@ -21,6 +21,28 @@ from flask_cors import CORS
 import re
 from werkzeug.utils import secure_filename
 
+# 可选依赖：用于HTML转PNG功能
+try:
+    from selenium import webdriver
+    from selenium.webdriver.chrome.service import Service
+    from selenium.webdriver.chrome.options import Options
+    from selenium.webdriver.common.by import By
+    from webdriver_manager.chrome import ChromeDriverManager
+    SELENIUM_AVAILABLE = True
+except ImportError:
+    SELENIUM_AVAILABLE = False
+    print("警告: selenium未安装，PNG图片生成功能将不可用")
+
+try:
+    from PIL import Image
+    import io
+    PIL_AVAILABLE = True
+except ImportError:
+    PIL_AVAILABLE = False
+    print("警告: Pillow未安装，PNG图片生成功能将不可用")
+
+import time
+
 app = Flask(__name__)
 CORS(app)
 
@@ -695,13 +717,161 @@ def parse_seq_file(file_content):
     return sequence
 
 def html_to_image(html_content, output_path):
-    """将HTML内容转换为图片（简化版本：先保存为HTML，后续可用selenium转换）"""
-    # 暂时先保存为HTML文件，后续可以添加selenium转换
-    with open(output_path.replace('.png', '.html'), 'w', encoding='utf-8') as f:
-        f.write(html_content)
-    # TODO: 使用selenium或playwright将HTML转为图片
-    # 暂时返回HTML文件路径
-    return output_path.replace('.png', '.html')
+    """将HTML内容转换为PNG图片，并裁剪空白部分"""
+    # 检查依赖是否可用
+    if not SELENIUM_AVAILABLE:
+        print("selenium未安装，跳过PNG生成")
+        return None
+    if not PIL_AVAILABLE:
+        print("Pillow未安装，跳过PNG生成")
+        return None
+    
+    driver = None
+    temp_html = None
+    try:
+        # 创建临时HTML文件
+        temp_html = output_path.replace('.png', '_temp.html')
+        with open(temp_html, 'w', encoding='utf-8') as f:
+            f.write(html_content)
+        
+        # 配置Chrome选项（无头模式）
+        chrome_options = Options()
+        chrome_options.add_argument('--headless')
+        chrome_options.add_argument('--no-sandbox')
+        chrome_options.add_argument('--disable-dev-shm-usage')
+        chrome_options.add_argument('--disable-gpu')
+        chrome_options.add_argument('--window-size=1920,1080')
+        chrome_options.add_argument('--hide-scrollbars')
+        chrome_options.add_argument('--disable-software-rasterizer')
+        
+        # 创建WebDriver
+        try:
+            # 获取chromedriver路径
+            driver_path = ChromeDriverManager().install()
+            
+            # 修复webdriver-manager的bug：如果返回的是THIRD_PARTY_NOTICES文件，查找实际的chromedriver
+            if 'THIRD_PARTY_NOTICES' in driver_path or not os.path.exists(driver_path):
+                # 在相同目录下查找chromedriver文件
+                driver_dir = os.path.dirname(driver_path)
+                actual_driver = os.path.join(driver_dir, 'chromedriver')
+                if os.path.exists(actual_driver) and os.access(actual_driver, os.X_OK):
+                    driver_path = actual_driver
+                else:
+                    # 尝试在整个.wdm目录中查找
+                    wdm_base = os.path.expanduser('~/.wdm')
+                    if os.path.exists(wdm_base):
+                        import glob
+                        chromedrivers = glob.glob(os.path.join(wdm_base, '**/chromedriver'), recursive=True)
+                        # 过滤掉THIRD_PARTY_NOTICES文件
+                        chromedrivers = [d for d in chromedrivers if 'THIRD_PARTY_NOTICES' not in d and os.access(d, os.X_OK)]
+                        if chromedrivers:
+                            driver_path = chromedrivers[0]
+            
+            # 确保chromedriver有执行权限（如果可能）
+            if os.path.exists(driver_path):
+                try:
+                    # 尝试添加执行权限
+                    current_mode = os.stat(driver_path).st_mode
+                    os.chmod(driver_path, current_mode | 0o111)  # 添加执行权限
+                except (OSError, PermissionError) as e:
+                    # 如果无法修改权限，检查是否已经有执行权限
+                    if not os.access(driver_path, os.X_OK):
+                        print(f"警告: 无法为chromedriver添加执行权限: {str(e)}")
+                        print(f"请手动运行: chmod +x {driver_path}")
+                        # 尝试继续，可能在某些系统上仍然可以工作
+                        pass
+            
+            # 验证chromedriver是否可执行
+            if not os.access(driver_path, os.X_OK):
+                # 尝试使用subprocess来添加权限
+                try:
+                    subprocess.run(['chmod', '+x', driver_path], check=False, timeout=5)
+                except:
+                    pass
+                
+                # 再次检查
+                if not os.access(driver_path, os.X_OK):
+                    raise Exception(
+                        f"chromedriver文件没有执行权限: {driver_path}\n"
+                        f"请手动运行: chmod +x {driver_path}"
+                    )
+            
+            service = Service(driver_path)
+            driver = webdriver.Chrome(service=service, options=chrome_options)
+        except Exception as e:
+            print(f"无法启动Chrome WebDriver: {str(e)}")
+            print("提示: 如果Chrome未安装，PNG生成功能将不可用")
+            import traceback
+            traceback.print_exc()
+            return None
+        
+        try:
+            # 加载HTML文件
+            file_url = f"file://{os.path.abspath(temp_html)}"
+            driver.get(file_url)
+            
+            # 等待页面加载
+            time.sleep(1.5)  # 增加等待时间确保样式加载完成
+            
+            # 获取页面元素（blast-container）
+            try:
+                element = driver.find_element(By.CLASS_NAME, "blast-container")
+            except:
+                # 如果找不到blast-container，使用body
+                element = driver.find_element(By.TAG_NAME, "body")
+            
+            # 截图
+            screenshot = element.screenshot_as_png
+            
+            # 使用PIL处理图片，裁剪空白部分
+            img = Image.open(io.BytesIO(screenshot))
+            
+            # 转换为RGB（如果是RGBA）
+            if img.mode == 'RGBA':
+                # 创建白色背景
+                rgb_img = Image.new('RGB', img.size, (255, 255, 255))
+                rgb_img.paste(img, mask=img.split()[3] if len(img.split()) == 4 else None)
+                img = rgb_img
+            
+            # 裁剪空白部分
+            # 获取图片的边界框（去除白色边缘）
+            bbox = img.getbbox()
+            if bbox:
+                # 添加一些边距（10像素）
+                left, top, right, bottom = bbox
+                margin = 10
+                left = max(0, left - margin)
+                top = max(0, top - margin)
+                right = min(img.width, right + margin)
+                bottom = min(img.height, bottom + margin)
+                
+                # 裁剪图片
+                cropped_img = img.crop((left, top, right, bottom))
+            else:
+                cropped_img = img
+            
+            # 保存PNG文件
+            cropped_img.save(output_path, 'PNG', optimize=True)
+            
+            return output_path
+            
+        finally:
+            if driver:
+                driver.quit()
+                
+    except Exception as e:
+        print(f"HTML转PNG失败: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        # 如果转换失败，返回None，但不影响主流程
+        return None
+    finally:
+        # 清理临时HTML文件
+        if temp_html and os.path.exists(temp_html):
+            try:
+                os.remove(temp_html)
+            except:
+                pass
 
 @app.route('/')
 def index():
@@ -865,6 +1035,17 @@ def batch_blast():
                 with open(html_path, 'w', encoding='utf-8') as f:
                     f.write(html_result)
                 
+                # 生成PNG图片文件
+                png_filename = safe_filename.replace('.seq', '.png')
+                png_path = os.path.join(batch_folder, png_filename)
+                try:
+                    html_to_image(html_result, png_path)
+                    if os.path.exists(png_path):
+                        print(f"已生成PNG图片: {png_filename}")
+                except Exception as e:
+                    print(f"生成PNG图片失败 {png_filename}: {str(e)}")
+                    # PNG生成失败不影响主流程
+                
                 query_length = len(sequence)
                 subject_length = best_species.get('length', 0)
                 query_cover_value = 0.0
@@ -947,6 +1128,16 @@ def download_results():
                 zipf.write(file_path, arcname)
     
     return send_file(zip_path, as_attachment=True, download_name=zip_filename)
+
+@app.route('/api/download-template', methods=['GET'])
+def download_template():
+    """下载序列文件模板"""
+    template_path = os.path.join('templates', 'sequence_template.seq')
+    
+    if not os.path.exists(template_path):
+        return jsonify({'error': '模板文件不存在'}), 404
+    
+    return send_file(template_path, as_attachment=True, download_name='sequence_template.seq')
 
 if __name__ == '__main__':
     load_species_db()

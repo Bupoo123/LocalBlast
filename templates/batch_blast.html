@@ -177,12 +177,18 @@
             1. 点击下方区域或拖拽文件上传多个.seq格式的序列文件<br>
             2. 系统将自动与所有物种进行比对，找出每个文件的最佳匹配<br>
             3. 处理完成后可以打包下载所有结果图片<br>
-            4. 支持的文件格式：.seq（每行一个序列片段）
+            4. 支持的文件格式：.seq（每行一个序列片段）<br>
+            5. <a href="/api/download-template" style="color: #0272BD; text-decoration: underline; font-weight: bold;">📥 下载序列文件模板</a>（包含3个示例序列）
         </div>
 
         <form id="batchForm">
             <div class="form-group">
                 <label>上传序列文件（.seq格式）:</label>
+                <div style="margin-bottom: 10px;">
+                    <a href="/api/download-template" style="color: #0272BD; text-decoration: none; font-size: 14px; padding: 8px 15px; border: 1px solid #0272BD; border-radius: 4px; display: inline-block; background: #f9f9f9;">
+                        📥 下载模板文件（sequence_template.seq）
+                    </a>
+                </div>
                 <div class="file-upload-area" id="uploadArea">
                     <p>点击选择文件或拖拽文件到此处</p>
                     <p style="font-size: 12px; color: #666;">支持多文件上传，文件格式：.seq</p>
