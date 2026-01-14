@@ -54,114 +54,99 @@ jobs:
         Copy-Item -Recurse templates $packageDir\templates
         
         # Create 一键安装.bat
-        $installScript = @"
-@echo off
-chcp 65001 >nul
-title LocalBlast - 一键安装
-echo.
-echo ==========================================
-echo LocalBlast - 一键安装程序
-echo ==========================================
-echo.
-echo 此脚本将自动检查并安装所需环境
-echo.
-echo [1/2] 检查BLAST+工具...
-echo.
-where blastn >nul 2>&1
-if %errorLevel% neq 0 (
-    echo [×] 未找到BLAST+工具
-    echo.
-    echo 请安装BLAST+工具：
-    echo 1. 访问 https://ftp.ncbi.nlm.nih.gov/blast/executables/blast+/LATEST/
-    echo 2. 下载Windows版本（如：ncbi-blast-*-win64.exe）
-    echo 3. 运行安装程序，安装时选择"Add to PATH"
-    echo 4. 安装完成后重新运行此脚本
-    echo.
-    pause
-    exit /b 1
-)
-blastn -version
-echo [√] BLAST+已安装
-echo.
-echo [2/2] 环境检查完成！
-echo.
-echo ==========================================
-echo 安装完成！
-echo ==========================================
-echo.
-echo 现在可以：
-echo 1. 双击运行 "启动LocalBlast.bat" 启动程序
-echo 2. 在浏览器中访问 http://localhost:5001
-echo.
-pause
-"@
-        Set-Content -Path "$packageDir\一键安装.bat" -Value $installScript -Encoding UTF8
+        $installScript = '@echo off' + "`n" +
+          'chcp 65001 >nul' + "`n" +
+          'title LocalBlast - 一键安装' + "`n" +
+          'echo.' + "`n" +
+          'echo ==========================================' + "`n" +
+          'echo LocalBlast - 一键安装程序' + "`n" +
+          'echo ==========================================' + "`n" +
+          'echo.' + "`n" +
+          'echo 此脚本将自动检查并安装所需环境' + "`n" +
+          'echo.' + "`n" +
+          'echo [1/2] 检查BLAST+工具...' + "`n" +
+          'echo.' + "`n" +
+          'where blastn >nul 2>&1' + "`n" +
+          'if %errorLevel% neq 0 (' + "`n" +
+          '    echo [×] 未找到BLAST+工具' + "`n" +
+          '    echo.' + "`n" +
+          '    echo 请安装BLAST+工具：' + "`n" +
+          '    echo 1. 访问 https://ftp.ncbi.nlm.nih.gov/blast/executables/blast+/LATEST/' + "`n" +
+          '    echo 2. 下载Windows版本（如：ncbi-blast-*-win64.exe）' + "`n" +
+          '    echo 3. 运行安装程序，安装时选择"Add to PATH"' + "`n" +
+          '    echo 4. 安装完成后重新运行此脚本' + "`n" +
+          '    echo.' + "`n" +
+          '    pause' + "`n" +
+          '    exit /b 1' + "`n" +
+          ')' + "`n" +
+          'blastn -version' + "`n" +
+          'echo [√] BLAST+已安装' + "`n" +
+          'echo.' + "`n" +
+          'echo [2/2] 环境检查完成！' + "`n" +
+          'echo.' + "`n" +
+          'echo ==========================================' + "`n" +
+          'echo 安装完成！' + "`n" +
+          'echo ==========================================' + "`n" +
+          'echo.' + "`n" +
+          'echo 现在可以：' + "`n" +
+          'echo 1. 双击运行 "启动LocalBlast.bat" 启动程序' + "`n" +
+          'echo 2. 在浏览器中访问 http://localhost:5001' + "`n" +
+          'echo.' + "`n" +
+          'pause'
+        [System.IO.File]::WriteAllText("$packageDir\一键安装.bat", $installScript, [System.Text.Encoding]::UTF8)
         
         # Create 启动LocalBlast.bat
-        $startScript = @"
-@echo off
-chcp 65001 >nul
-title LocalBlast - 本地BLAST工具
-echo.
-echo ==========================================
-echo LocalBlast - 本地BLAST工具
-echo ==========================================
-echo.
-echo 正在启动服务...
-echo.
-echo 服务地址: http://localhost:5001
-echo.
-echo 提示：
-echo - 保持此窗口打开以运行服务
-echo - 关闭此窗口将停止服务
-echo - 按 Ctrl+C 也可以停止服务
-echo.
-echo ==========================================
-echo.
-LocalBlast.exe
-pause
-"@
-        Set-Content -Path "$packageDir\启动LocalBlast.bat" -Value $startScript -Encoding UTF8
+        $startScript = '@echo off' + "`n" +
+          'chcp 65001 >nul' + "`n" +
+          'title LocalBlast - 本地BLAST工具' + "`n" +
+          'echo.' + "`n" +
+          'echo ==========================================' + "`n" +
+          'echo LocalBlast - 本地BLAST工具' + "`n" +
+          'echo ==========================================' + "`n" +
+          'echo.' + "`n" +
+          'echo 正在启动服务...' + "`n" +
+          'echo.' + "`n" +
+          'echo 服务地址: http://localhost:5001' + "`n" +
+          'echo.' + "`n" +
+          'echo 提示：' + "`n" +
+          'echo - 保持此窗口打开以运行服务' + "`n" +
+          'echo - 关闭此窗口将停止服务' + "`n" +
+          'echo - 按 Ctrl+C 也可以停止服务' + "`n" +
+          'echo.' + "`n" +
+          'echo ==========================================' + "`n" +
+          'echo.' + "`n" +
+          'LocalBlast.exe' + "`n" +
+          'pause'
+        [System.IO.File]::WriteAllText("$packageDir\启动LocalBlast.bat", $startScript, [System.Text.Encoding]::UTF8)
         
         # Create 使用说明.txt
-        $readme = @"
-LocalBlast Windows 可执行文件安装包
-
-==========================================
-快速开始
-==========================================
-
-1. 双击运行 "一键安装.bat" 检查环境
-2. 双击运行 "启动LocalBlast.bat" 启动程序
-3. 在浏览器中访问 http://localhost:5001
-
-==========================================
-系统要求
-==========================================
-
-1. BLAST+工具 （从 https://ftp.ncbi.nlm.nih.gov/blast/executables/blast+/LATEST/ 下载）
-
-注意：本exe文件已包含所有Python依赖，不需要安装Python。
-
-==========================================
-文件说明
-==========================================
-
-- LocalBlast.exe: 主程序（已包含所有Python依赖）
-- 一键安装.bat: 环境检查脚本
-- 启动LocalBlast.bat: 启动程序脚本
-- species_db.json: 参比序列数据库
-- templates/: HTML模板文件夹
-
-==========================================
-注意事项
-==========================================
-
-1. 首次使用前请先运行"一键安装.bat"检查环境
-2. BLAST+工具需要单独安装（无法打包到exe中）
-3. 如果遇到问题，请查看错误提示或联系技术支持
-"@
-        Set-Content -Path "$packageDir\使用说明.txt" -Value $readme -Encoding UTF8
+        $readme = 'LocalBlast Windows 可执行文件安装包' + "`n`n" +
+          '==========================================' + "`n" +
+          '快速开始' + "`n" +
+          '==========================================' + "`n`n" +
+          '1. 双击运行 "一键安装.bat" 检查环境' + "`n" +
+          '2. 双击运行 "启动LocalBlast.bat" 启动程序' + "`n" +
+          '3. 在浏览器中访问 http://localhost:5001' + "`n`n" +
+          '==========================================' + "`n" +
+          '系统要求' + "`n" +
+          '==========================================' + "`n`n" +
+          '1. BLAST+工具 （从 https://ftp.ncbi.nlm.nih.gov/blast/executables/blast+/LATEST/ 下载）' + "`n`n" +
+          '注意：本exe文件已包含所有Python依赖，不需要安装Python。' + "`n`n" +
+          '==========================================' + "`n" +
+          '文件说明' + "`n" +
+          '==========================================' + "`n`n" +
+          '- LocalBlast.exe: 主程序（已包含所有Python依赖）' + "`n" +
+          '- 一键安装.bat: 环境检查脚本' + "`n" +
+          '- 启动LocalBlast.bat: 启动程序脚本' + "`n" +
+          '- species_db.json: 参比序列数据库' + "`n" +
+          '- templates/: HTML模板文件夹' + "`n`n" +
+          '==========================================' + "`n" +
+          '注意事项' + "`n" +
+          '==========================================' + "`n`n" +
+          '1. 首次使用前请先运行"一键安装.bat"检查环境' + "`n" +
+          '2. BLAST+工具需要单独安装（无法打包到exe中）' + "`n" +
+          '3. 如果遇到问题，请查看错误提示或联系技术支持'
+        [System.IO.File]::WriteAllText("$packageDir\使用说明.txt", $readme, [System.Text.Encoding]::UTF8)
         
     - name: Create ZIP archive
       run: |
