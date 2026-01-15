@@ -7,6 +7,7 @@ LocalBlast - 本地化BLAST程序
 """
 
 import os
+import sys
 import json
 import subprocess
 import tempfile
@@ -43,12 +44,31 @@ except ImportError:
 
 import time
 
-app = Flask(__name__)
+def get_base_path():
+    """获取应用基础路径，兼容PyInstaller打包"""
+    if getattr(sys, 'frozen', False):
+        # PyInstaller打包后的exe
+        return os.path.dirname(sys.executable)
+    else:
+        # 开发环境
+        return os.path.dirname(os.path.abspath(__file__))
+
+# 获取基础路径
+BASE_PATH = get_base_path()
+
+# 设置Flask模板和静态文件路径（兼容PyInstaller打包）
+if getattr(sys, 'frozen', False):
+    # PyInstaller打包后
+    template_folder = os.path.join(BASE_PATH, 'templates')
+    app = Flask(__name__, template_folder=template_folder)
+else:
+    # 开发环境
+    app = Flask(__name__)
 CORS(app)
 
-# 配置
-UPLOAD_FOLDER = 'uploads'
-RESULTS_FOLDER = 'results'
+# 配置（使用绝对路径，兼容PyInstaller打包）
+UPLOAD_FOLDER = os.path.join(BASE_PATH, 'uploads')
+RESULTS_FOLDER = os.path.join(BASE_PATH, 'results')
 ALLOWED_EXTENSIONS = {'seq'}
 
 # 确保文件夹存在
@@ -56,7 +76,7 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(RESULTS_FOLDER, exist_ok=True)
 
 # 加载物种数据库
-SPECIES_DB_FILE = 'species_db.json'
+SPECIES_DB_FILE = os.path.join(BASE_PATH, 'species_db.json')
 SPECIES_DB = []
 
 def load_species_db():
@@ -1132,7 +1152,12 @@ def download_results():
 @app.route('/api/download-template', methods=['GET'])
 def download_template():
     """下载序列文件模板"""
-    template_path = os.path.join('templates', 'sequence_template.seq')
+    if getattr(sys, 'frozen', False):
+        # PyInstaller打包后，模板在exe同目录
+        template_path = os.path.join(BASE_PATH, 'templates', 'sequence_template.seq')
+    else:
+        # 开发环境
+        template_path = os.path.join('templates', 'sequence_template.seq')
     
     if not os.path.exists(template_path):
         return jsonify({'error': '模板文件不存在'}), 404
