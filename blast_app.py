@@ -263,8 +263,8 @@ def generate_html_result(query_sequence, subject_info, blast_results, is_best_ma
     
     subject_id = f"lcl|Query_{query_id} (dna)"
     
-    # Subject Descr 始终显示 None
-    subject_description = 'None'
+    # Subject Descr 始终显示 None provided
+    subject_description = 'None provided'
     
     # 计算最佳匹配结果
     best_result = None
@@ -675,7 +675,7 @@ def generate_html_result(query_sequence, subject_info, blast_results, is_best_ma
         <tr>
           <td class="col-checkbox"><input type="checkbox" checked></td>
           <td class="col-description">
-            <a href="#" class="link-blue">None</a>
+            <a href="#" class="link-blue">None provided</a>
           </td>
           <td class="col-scientific"></td>
           <td class="col-small">{int(result['bitscore'])}</td>
