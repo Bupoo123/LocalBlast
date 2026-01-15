@@ -736,23 +736,167 @@ def parse_seq_file(file_content):
     sequence = re.sub(r'[^ATCG]', '', sequence.upper())
     return sequence
 
-def html_to_image(html_content, output_path):
-    """将HTML内容转换为PNG图片，并裁剪空白部分"""
-    # 检查依赖是否可用
-    if not SELENIUM_AVAILABLE:
-        print("selenium未安装，跳过PNG生成")
-        return None
-    if not PIL_AVAILABLE:
-        print("Pillow未安装，跳过PNG生成")
-        return None
+# 全局变量：缓存ChromeDriver实例（用于批量处理时复用）
+_cached_driver = None
+_cached_driver_path = None
+
+def get_chromedriver_path():
+    """获取ChromeDriver路径（带缓存和超时）"""
+    global _cached_driver_path
     
-    driver = None
-    temp_html = None
+    # 如果已经缓存，直接返回
+    if _cached_driver_path and os.path.exists(_cached_driver_path):
+        return _cached_driver_path
+    
+    driver_path = None
+    
+    # 优先查找本地ChromeDriver（在exe同目录或drivers子目录）
+    local_driver_paths = []
+    if sys.platform == 'win32':
+        local_driver_paths = [
+            os.path.join(BASE_PATH, 'chromedriver.exe'),
+            os.path.join(BASE_PATH, 'drivers', 'chromedriver.exe'),
+        ]
+    else:
+        local_driver_paths = [
+            os.path.join(BASE_PATH, 'chromedriver'),
+            os.path.join(BASE_PATH, 'drivers', 'chromedriver'),
+        ]
+    
+    # 查找本地ChromeDriver
+    for local_path in local_driver_paths:
+        if os.path.exists(local_path) and os.path.isfile(local_path):
+            driver_path = local_path
+            print(f"使用本地ChromeDriver: {driver_path}")
+            break
+    
+    # 如果程序目录没有，查找~/.wdm目录中的缓存（优先于网络下载）
+    if not driver_path:
+        wdm_base = os.path.expanduser('~/.wdm')
+        if os.path.exists(wdm_base):
+            import glob
+            pattern = os.path.join(wdm_base, '**/chromedriver*')
+            chromedrivers = glob.glob(pattern, recursive=True)
+            # 过滤掉THIRD_PARTY_NOTICES文件
+            chromedrivers = [d for d in chromedrivers 
+                           if 'THIRD_PARTY_NOTICES' not in d 
+                           and os.path.exists(d)
+                           and os.path.isfile(d)]
+            if chromedrivers:
+                chromedrivers.sort(key=os.path.getmtime, reverse=True)
+                driver_path = chromedrivers[0]
+                print(f"使用本地缓存的ChromeDriver: {driver_path}")
+    
+    # 如果本地和缓存都没有，才尝试从网络下载（带超时）
+    if not driver_path:
+        try:
+            print("本地未找到ChromeDriver，尝试从网络下载（最多等待10秒）...")
+            
+            # Windows不支持signal，使用threading实现超时
+            if sys.platform == 'win32':
+                import threading
+                download_result = {'driver_path': None, 'error': None}
+                
+                def download_driver():
+                    try:
+                        download_result['driver_path'] = ChromeDriverManager().install()
+                    except Exception as e:
+                        download_result['error'] = e
+                
+                download_thread = threading.Thread(target=download_driver)
+                download_thread.daemon = True
+                download_thread.start()
+                download_thread.join(timeout=10)  # 最多等待10秒
+                
+                if download_thread.is_alive():
+                    raise TimeoutError("ChromeDriver下载超时（10秒）")
+                
+                if download_result['error']:
+                    raise download_result['error']
+                
+                driver_path = download_result['driver_path']
+                print(f"从网络下载ChromeDriver: {driver_path}")
+            else:
+                # macOS/Linux使用signal实现超时
+                import signal
+                
+                def timeout_handler(signum, frame):
+                    raise TimeoutError("ChromeDriver下载超时")
+                
+                signal.signal(signal.SIGALRM, timeout_handler)
+                signal.alarm(10)
+                
+                try:
+                    driver_path = ChromeDriverManager().install()
+                    print(f"从网络下载ChromeDriver: {driver_path}")
+                finally:
+                    signal.alarm(0)  # 取消超时
+                    
+        except (ConnectionError, TimeoutError, Exception) as e:
+            print(f"网络下载失败或超时: {str(e)}")
+            raise Exception("无法获取ChromeDriver：本地未找到且网络下载失败")
+    
+    # 修复webdriver-manager的bug：如果返回的是THIRD_PARTY_NOTICES文件，查找实际的chromedriver
+    if driver_path and ('THIRD_PARTY_NOTICES' in driver_path or not os.path.exists(driver_path)):
+        # 在相同目录下查找chromedriver文件
+        driver_dir = os.path.dirname(driver_path)
+        if sys.platform == 'win32':
+            actual_driver = os.path.join(driver_dir, 'chromedriver.exe')
+        else:
+            actual_driver = os.path.join(driver_dir, 'chromedriver')
+        
+        if os.path.exists(actual_driver) and os.path.isfile(actual_driver):
+            driver_path = actual_driver
+        else:
+            # 尝试在整个.wdm目录中查找
+            wdm_base = os.path.expanduser('~/.wdm')
+            if os.path.exists(wdm_base):
+                import glob
+                pattern = os.path.join(wdm_base, '**/chromedriver*')
+                chromedrivers = glob.glob(pattern, recursive=True)
+                # 过滤掉THIRD_PARTY_NOTICES文件
+                chromedrivers = [d for d in chromedrivers 
+                               if 'THIRD_PARTY_NOTICES' not in d 
+                               and os.path.exists(d)
+                               and os.path.isfile(d)]
+                if chromedrivers:
+                    chromedrivers.sort(key=os.path.getmtime, reverse=True)
+                    driver_path = chromedrivers[0]
+    
+    if not driver_path or not os.path.exists(driver_path):
+        raise Exception("无法找到ChromeDriver")
+    
+    # Windows系统不需要检查执行权限
+    if sys.platform != 'win32':
+        # 确保chromedriver有执行权限（macOS/Linux）
+        if os.path.exists(driver_path):
+            try:
+                current_mode = os.stat(driver_path).st_mode
+                os.chmod(driver_path, current_mode | 0o111)
+            except (OSError, PermissionError):
+                pass
+    
+    # 缓存路径
+    _cached_driver_path = driver_path
+    return driver_path
+
+def get_chromedriver_instance():
+    """获取ChromeDriver实例（复用，避免重复启动）"""
+    global _cached_driver
+    
+    # 如果已有实例且可用，直接返回
+    if _cached_driver:
+        try:
+            # 测试driver是否仍然可用
+            _cached_driver.current_url
+            return _cached_driver
+        except:
+            # driver已失效，重置
+            _cached_driver = None
+    
+    # 创建新的driver实例
     try:
-        # 创建临时HTML文件
-        temp_html = output_path.replace('.png', '_temp.html')
-        with open(temp_html, 'w', encoding='utf-8') as f:
-            f.write(html_content)
+        driver_path = get_chromedriver_path()
         
         # 配置Chrome选项（无头模式）
         chrome_options = Options()
@@ -764,113 +908,71 @@ def html_to_image(html_content, output_path):
         chrome_options.add_argument('--hide-scrollbars')
         chrome_options.add_argument('--disable-software-rasterizer')
         
-        # 创建WebDriver
+        service = Service(driver_path)
+        _cached_driver = webdriver.Chrome(service=service, options=chrome_options)
+        print("ChromeDriver已启动（将复用此实例）")
+        return _cached_driver
+    except Exception as e:
+        print(f"无法启动Chrome WebDriver: {str(e)}")
+        print("提示: PNG生成功能将不可用，但HTML文件仍会正常生成")
+        return None
+
+def close_chromedriver():
+    """关闭ChromeDriver实例"""
+    global _cached_driver
+    if _cached_driver:
         try:
-            driver_path = None
-            
-            # 优先查找本地ChromeDriver（在exe同目录或drivers子目录）
-            local_driver_paths = []
-            if sys.platform == 'win32':
-                local_driver_paths = [
-                    os.path.join(BASE_PATH, 'chromedriver.exe'),
-                    os.path.join(BASE_PATH, 'drivers', 'chromedriver.exe'),
-                ]
-            else:
-                local_driver_paths = [
-                    os.path.join(BASE_PATH, 'chromedriver'),
-                    os.path.join(BASE_PATH, 'drivers', 'chromedriver'),
-                ]
-            
-            # 查找本地ChromeDriver
-            for local_path in local_driver_paths:
-                if os.path.exists(local_path) and os.path.isfile(local_path):
-                    driver_path = local_path
-                    print(f"使用本地ChromeDriver: {driver_path}")
-                    break
-            
-            # 如果本地没有，尝试从网络下载（作为备选）
-            if not driver_path:
-                try:
-                    print("本地未找到ChromeDriver，尝试从网络下载...")
-                    driver_path = ChromeDriverManager().install()
-                    print(f"从网络下载ChromeDriver: {driver_path}")
-                except (ConnectionError, Exception) as e:
-                    print(f"网络下载失败: {str(e)}")
-                    print("提示: 请确保网络连接正常，或将ChromeDriver放在程序目录中")
-                    # 尝试在整个.wdm目录中查找已下载的
-                    wdm_base = os.path.expanduser('~/.wdm')
-                    if os.path.exists(wdm_base):
-                        import glob
-                        pattern = os.path.join(wdm_base, '**/chromedriver*')
-                        chromedrivers = glob.glob(pattern, recursive=True)
-                        # 过滤掉THIRD_PARTY_NOTICES文件
-                        chromedrivers = [d for d in chromedrivers 
-                                       if 'THIRD_PARTY_NOTICES' not in d 
-                                       and os.path.exists(d)
-                                       and os.path.isfile(d)]
-                        if chromedrivers:
-                            chromedrivers.sort(key=os.path.getmtime, reverse=True)
-                            driver_path = chromedrivers[0]
-                            print(f"使用本地缓存的ChromeDriver: {driver_path}")
-                        else:
-                            raise Exception("无法获取ChromeDriver：本地未找到且网络下载失败")
-                    else:
-                        raise Exception("无法获取ChromeDriver：本地未找到且网络下载失败")
-            
-            # 修复webdriver-manager的bug：如果返回的是THIRD_PARTY_NOTICES文件，查找实际的chromedriver
-            if driver_path and ('THIRD_PARTY_NOTICES' in driver_path or not os.path.exists(driver_path)):
-                # 在相同目录下查找chromedriver文件
-                driver_dir = os.path.dirname(driver_path)
-                if sys.platform == 'win32':
-                    actual_driver = os.path.join(driver_dir, 'chromedriver.exe')
-                else:
-                    actual_driver = os.path.join(driver_dir, 'chromedriver')
-                
-                if os.path.exists(actual_driver) and os.path.isfile(actual_driver):
-                    driver_path = actual_driver
-                else:
-                    # 尝试在整个.wdm目录中查找
-                    wdm_base = os.path.expanduser('~/.wdm')
-                    if os.path.exists(wdm_base):
-                        import glob
-                        pattern = os.path.join(wdm_base, '**/chromedriver*')
-                        chromedrivers = glob.glob(pattern, recursive=True)
-                        # 过滤掉THIRD_PARTY_NOTICES文件
-                        chromedrivers = [d for d in chromedrivers 
-                                       if 'THIRD_PARTY_NOTICES' not in d 
-                                       and os.path.exists(d)
-                                       and os.path.isfile(d)]
-                        if chromedrivers:
-                            chromedrivers.sort(key=os.path.getmtime, reverse=True)
-                            driver_path = chromedrivers[0]
-            
-            if not driver_path or not os.path.exists(driver_path):
-                raise Exception("无法找到ChromeDriver")
-            
-            # Windows系统不需要检查执行权限
-            if sys.platform != 'win32':
-                # 确保chromedriver有执行权限（macOS/Linux）
-                if os.path.exists(driver_path):
-                    try:
-                        current_mode = os.stat(driver_path).st_mode
-                        os.chmod(driver_path, current_mode | 0o111)
-                    except (OSError, PermissionError):
-                        pass
-            
-            service = Service(driver_path)
-            driver = webdriver.Chrome(service=service, options=chrome_options)
-        except Exception as e:
-            print(f"无法启动Chrome WebDriver: {str(e)}")
-            print("提示: PNG生成功能将不可用，但HTML文件仍会正常生成")
-            return None
+            _cached_driver.quit()
+        except:
+            pass
+        _cached_driver = None
+
+def html_to_image(html_content, output_path, driver=None):
+    """将HTML内容转换为PNG图片，并裁剪空白部分
+    
+    Args:
+        html_content: HTML内容
+        output_path: 输出PNG文件路径
+        driver: 可选的WebDriver实例（用于批量处理时复用）
+    """
+    # 检查依赖是否可用
+    if not SELENIUM_AVAILABLE:
+        print("selenium未安装，跳过PNG生成")
+        return None
+    if not PIL_AVAILABLE:
+        print("Pillow未安装，跳过PNG生成")
+        return None
+    
+    temp_html = None
+    use_external_driver = driver is not None
+    
+    try:
+        # 创建临时HTML文件
+        temp_html = output_path.replace('.png', '_temp.html')
+        with open(temp_html, 'w', encoding='utf-8') as f:
+            f.write(html_content)
+        
+        # 如果没有传入driver，创建新的（单文件处理模式）
+        if not driver:
+            driver = get_chromedriver_instance()
+            if not driver:
+                return None
         
         try:
             # 加载HTML文件
             file_url = f"file://{os.path.abspath(temp_html)}"
             driver.get(file_url)
             
-            # 等待页面加载
-            time.sleep(1.5)  # 增加等待时间确保样式加载完成
+            # 使用显式等待替代固定sleep（最多等待2秒）
+            try:
+                from selenium.webdriver.support.ui import WebDriverWait
+                from selenium.webdriver.support import expected_conditions as EC
+                WebDriverWait(driver, 2).until(
+                    EC.presence_of_element_located((By.TAG_NAME, "body"))
+                )
+            except:
+                # 如果显式等待失败，使用固定等待
+                time.sleep(0.5)
             
             # 获取页面元素（blast-container）
             try:
@@ -915,8 +1017,9 @@ def html_to_image(html_content, output_path):
             return output_path
             
         finally:
-            if driver:
-                driver.quit()
+            # 只有在单文件处理模式时才关闭driver
+            if not use_external_driver and driver:
+                close_chromedriver()
                 
     except Exception as e:
         print(f"HTML转PNG失败: {str(e)}")
@@ -1054,7 +1157,19 @@ def batch_blast():
     errors = []
     summary_rows = []
     
+    # 批量处理时，复用同一个ChromeDriver实例（提升性能）
+    shared_driver = None
     try:
+        # 尝试启动ChromeDriver（如果PNG功能可用）
+        if SELENIUM_AVAILABLE and PIL_AVAILABLE:
+            try:
+                shared_driver = get_chromedriver_instance()
+                if shared_driver:
+                    print("已启动共享ChromeDriver，将用于所有文件的PNG生成")
+            except Exception as e:
+                print(f"无法启动ChromeDriver，PNG功能将不可用: {str(e)}")
+                shared_driver = None
+        
         for file in files:
             if not file.filename.endswith('.seq'):
                 errors.append(f"{file.filename}: 不是.seq格式文件")
@@ -1094,11 +1209,11 @@ def batch_blast():
                 with open(html_path, 'w', encoding='utf-8') as f:
                     f.write(html_result)
                 
-                # 生成PNG图片文件
+                # 生成PNG图片文件（使用共享的driver实例）
                 png_filename = safe_filename.replace('.seq', '.png')
                 png_path = os.path.join(batch_folder, png_filename)
                 try:
-                    html_to_image(html_result, png_path)
+                    html_to_image(html_result, png_path, driver=shared_driver)
                     if os.path.exists(png_path):
                         print(f"已生成PNG图片: {png_filename}")
                 except Exception as e:
@@ -1161,6 +1276,14 @@ def batch_blast():
     
     except Exception as e:
         return jsonify({'error': f'批量处理失败: {str(e)}'}), 500
+    finally:
+        # 关闭共享的ChromeDriver实例
+        if shared_driver:
+            try:
+                close_chromedriver()
+                print("已关闭共享ChromeDriver")
+            except Exception as e:
+                print(f"关闭ChromeDriver时出错: {str(e)}")
 
 @app.route('/api/download-results', methods=['GET'])
 def download_results():
