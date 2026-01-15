@@ -766,63 +766,102 @@ def html_to_image(html_content, output_path):
         
         # 创建WebDriver
         try:
-            # 获取chromedriver路径
-            driver_path = ChromeDriverManager().install()
+            driver_path = None
+            
+            # 优先查找本地ChromeDriver（在exe同目录或drivers子目录）
+            local_driver_paths = []
+            if sys.platform == 'win32':
+                local_driver_paths = [
+                    os.path.join(BASE_PATH, 'chromedriver.exe'),
+                    os.path.join(BASE_PATH, 'drivers', 'chromedriver.exe'),
+                ]
+            else:
+                local_driver_paths = [
+                    os.path.join(BASE_PATH, 'chromedriver'),
+                    os.path.join(BASE_PATH, 'drivers', 'chromedriver'),
+                ]
+            
+            # 查找本地ChromeDriver
+            for local_path in local_driver_paths:
+                if os.path.exists(local_path) and os.path.isfile(local_path):
+                    driver_path = local_path
+                    print(f"使用本地ChromeDriver: {driver_path}")
+                    break
+            
+            # 如果本地没有，尝试从网络下载（作为备选）
+            if not driver_path:
+                try:
+                    print("本地未找到ChromeDriver，尝试从网络下载...")
+                    driver_path = ChromeDriverManager().install()
+                    print(f"从网络下载ChromeDriver: {driver_path}")
+                except (ConnectionError, Exception) as e:
+                    print(f"网络下载失败: {str(e)}")
+                    print("提示: 请确保网络连接正常，或将ChromeDriver放在程序目录中")
+                    # 尝试在整个.wdm目录中查找已下载的
+                    wdm_base = os.path.expanduser('~/.wdm')
+                    if os.path.exists(wdm_base):
+                        import glob
+                        pattern = os.path.join(wdm_base, '**/chromedriver*')
+                        chromedrivers = glob.glob(pattern, recursive=True)
+                        # 过滤掉THIRD_PARTY_NOTICES文件
+                        chromedrivers = [d for d in chromedrivers 
+                                       if 'THIRD_PARTY_NOTICES' not in d 
+                                       and os.path.exists(d)
+                                       and os.path.isfile(d)]
+                        if chromedrivers:
+                            chromedrivers.sort(key=os.path.getmtime, reverse=True)
+                            driver_path = chromedrivers[0]
+                            print(f"使用本地缓存的ChromeDriver: {driver_path}")
+                        else:
+                            raise Exception("无法获取ChromeDriver：本地未找到且网络下载失败")
+                    else:
+                        raise Exception("无法获取ChromeDriver：本地未找到且网络下载失败")
             
             # 修复webdriver-manager的bug：如果返回的是THIRD_PARTY_NOTICES文件，查找实际的chromedriver
-            if 'THIRD_PARTY_NOTICES' in driver_path or not os.path.exists(driver_path):
+            if driver_path and ('THIRD_PARTY_NOTICES' in driver_path or not os.path.exists(driver_path)):
                 # 在相同目录下查找chromedriver文件
                 driver_dir = os.path.dirname(driver_path)
-                actual_driver = os.path.join(driver_dir, 'chromedriver')
-                if os.path.exists(actual_driver) and os.access(actual_driver, os.X_OK):
+                if sys.platform == 'win32':
+                    actual_driver = os.path.join(driver_dir, 'chromedriver.exe')
+                else:
+                    actual_driver = os.path.join(driver_dir, 'chromedriver')
+                
+                if os.path.exists(actual_driver) and os.path.isfile(actual_driver):
                     driver_path = actual_driver
                 else:
                     # 尝试在整个.wdm目录中查找
                     wdm_base = os.path.expanduser('~/.wdm')
                     if os.path.exists(wdm_base):
                         import glob
-                        chromedrivers = glob.glob(os.path.join(wdm_base, '**/chromedriver'), recursive=True)
+                        pattern = os.path.join(wdm_base, '**/chromedriver*')
+                        chromedrivers = glob.glob(pattern, recursive=True)
                         # 过滤掉THIRD_PARTY_NOTICES文件
-                        chromedrivers = [d for d in chromedrivers if 'THIRD_PARTY_NOTICES' not in d and os.access(d, os.X_OK)]
+                        chromedrivers = [d for d in chromedrivers 
+                                       if 'THIRD_PARTY_NOTICES' not in d 
+                                       and os.path.exists(d)
+                                       and os.path.isfile(d)]
                         if chromedrivers:
+                            chromedrivers.sort(key=os.path.getmtime, reverse=True)
                             driver_path = chromedrivers[0]
             
-            # 确保chromedriver有执行权限（如果可能）
-            if os.path.exists(driver_path):
-                try:
-                    # 尝试添加执行权限
-                    current_mode = os.stat(driver_path).st_mode
-                    os.chmod(driver_path, current_mode | 0o111)  # 添加执行权限
-                except (OSError, PermissionError) as e:
-                    # 如果无法修改权限，检查是否已经有执行权限
-                    if not os.access(driver_path, os.X_OK):
-                        print(f"警告: 无法为chromedriver添加执行权限: {str(e)}")
-                        print(f"请手动运行: chmod +x {driver_path}")
-                        # 尝试继续，可能在某些系统上仍然可以工作
-                        pass
+            if not driver_path or not os.path.exists(driver_path):
+                raise Exception("无法找到ChromeDriver")
             
-            # 验证chromedriver是否可执行
-            if not os.access(driver_path, os.X_OK):
-                # 尝试使用subprocess来添加权限
-                try:
-                    subprocess.run(['chmod', '+x', driver_path], check=False, timeout=5)
-                except:
-                    pass
-                
-                # 再次检查
-                if not os.access(driver_path, os.X_OK):
-                    raise Exception(
-                        f"chromedriver文件没有执行权限: {driver_path}\n"
-                        f"请手动运行: chmod +x {driver_path}"
-                    )
+            # Windows系统不需要检查执行权限
+            if sys.platform != 'win32':
+                # 确保chromedriver有执行权限（macOS/Linux）
+                if os.path.exists(driver_path):
+                    try:
+                        current_mode = os.stat(driver_path).st_mode
+                        os.chmod(driver_path, current_mode | 0o111)
+                    except (OSError, PermissionError):
+                        pass
             
             service = Service(driver_path)
             driver = webdriver.Chrome(service=service, options=chrome_options)
         except Exception as e:
             print(f"无法启动Chrome WebDriver: {str(e)}")
-            print("提示: 如果Chrome未安装，PNG生成功能将不可用")
-            import traceback
-            traceback.print_exc()
+            print("提示: PNG生成功能将不可用，但HTML文件仍会正常生成")
             return None
         
         try:

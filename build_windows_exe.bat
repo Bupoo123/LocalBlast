@@ -32,6 +32,36 @@ if exist build rmdir /s /q build
 if exist dist rmdir /s /q dist
 if exist blast_app.spec del /q blast_app.spec
 
+echo [2.5/4] 下载ChromeDriver（可选）...
+if not exist drivers mkdir drivers
+python -c "try:
+    from webdriver_manager.chrome import ChromeDriverManager
+    import os, shutil, glob
+    path = ChromeDriverManager().install()
+    # 修复路径问题
+    if 'THIRD_PARTY_NOTICES' in path:
+        dir_path = os.path.dirname(path)
+        actual_path = os.path.join(dir_path, 'chromedriver.exe')
+        if os.path.exists(actual_path):
+            path = actual_path
+        else:
+            # 在.wdm目录中查找
+            wdm_base = os.path.expanduser('~/.wdm')
+            if os.path.exists(wdm_base):
+                drivers = glob.glob(os.path.join(wdm_base, '**/chromedriver.exe'), recursive=True)
+                if drivers:
+                    path = drivers[0]
+    if os.path.exists(path):
+        shutil.copy(path, 'drivers\\chromedriver.exe')
+        print('ChromeDriver已下载')
+except Exception as e:
+    print(f'ChromeDriver下载失败: {e}')" 2>nul
+if exist drivers\chromedriver.exe (
+    echo [√] ChromeDriver已下载
+) else (
+    echo [!] ChromeDriver下载失败，PNG功能将尝试在线下载
+)
+
 echo [3/4] 使用PyInstaller打包...
 echo 这可能需要几分钟时间，请耐心等待...
 echo.
@@ -70,6 +100,14 @@ copy dist\LocalBlast.exe %PACKAGE_DIR%\ >nul
 REM 复制必要文件
 copy species_db.json %PACKAGE_DIR%\ >nul
 xcopy /E /I /Y templates %PACKAGE_DIR%\templates >nul
+
+REM 复制ChromeDriver（如果存在）
+if exist drivers\chromedriver.exe (
+    copy drivers\chromedriver.exe %PACKAGE_DIR%\ >nul
+    echo [√] 已包含ChromeDriver
+) else (
+    echo [!] ChromeDriver未找到，PNG功能可能需要网络连接
+)
 
 REM 创建一键安装脚本
 (

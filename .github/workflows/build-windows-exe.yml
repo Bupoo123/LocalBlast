@@ -25,6 +25,72 @@ jobs:
         pip install -r requirements.txt
         pip install pyinstaller
         
+    - name: Download ChromeDriver
+      run: |
+        # 创建drivers目录
+        New-Item -ItemType Directory -Path "drivers" -Force | Out-Null
+        
+        # 尝试获取Chrome版本
+        try {
+          $chromePath = "C:\Program Files\Google\Chrome\Application\chrome.exe"
+          if (Test-Path $chromePath) {
+            $versionInfo = (Get-Item $chromePath).VersionInfo
+            $chromeVersion = "$($versionInfo.FileMajorPart).$($versionInfo.FileMinorPart).$($versionInfo.FileBuildPart)"
+            Write-Host "检测到Chrome版本: $chromeVersion"
+            $majorVersion = $versionInfo.FileMajorPart
+          } else {
+            Write-Host "Chrome未安装，使用最新版ChromeDriver"
+            $majorVersion = "latest"
+          }
+        } catch {
+          Write-Host "无法检测Chrome版本，使用最新版ChromeDriver"
+          $majorVersion = "latest"
+        }
+        
+        # 下载ChromeDriver
+        try {
+          if ($majorVersion -eq "latest") {
+            # 使用Chrome for Testing API获取最新版本
+            $versionUrl = "https://googlechromelabs.github.io/chrome-for-testing/last-known-good-versions-with-downloads.json"
+            $versionInfo = Invoke-RestMethod -Uri $versionUrl
+            $driverVersion = $versionInfo.channels.Stable.version
+            $driverUrl = $versionInfo.channels.Stable.downloads.chromedriver | Where-Object { $_.platform -eq "win64" } | Select-Object -ExpandProperty url
+          } else {
+            # 使用传统API
+            $versionUrl = "https://chromedriver.storage.googleapis.com/LATEST_RELEASE_$majorVersion"
+            try {
+              $latestVersion = (Invoke-WebRequest -Uri $versionUrl -UseBasicParsing).Content.Trim()
+              $driverUrl = "https://chromedriver.storage.googleapis.com/$latestVersion/chromedriver_win32.zip"
+            } catch {
+              # 如果失败，使用Chrome for Testing API
+              $versionUrl = "https://googlechromelabs.github.io/chrome-for-testing/last-known-good-versions-with-downloads.json"
+              $versionInfo = Invoke-RestMethod -Uri $versionUrl
+              $driverVersion = $versionInfo.channels.Stable.version
+              $driverUrl = $versionInfo.channels.Stable.downloads.chromedriver | Where-Object { $_.platform -eq "win64" } | Select-Object -ExpandProperty url
+            }
+          }
+          
+          Write-Host "下载ChromeDriver: $driverUrl"
+          $driverZip = "chromedriver.zip"
+          Invoke-WebRequest -Uri $driverUrl -OutFile $driverZip
+          Expand-Archive -Path $driverZip -DestinationPath "drivers" -Force
+          Remove-Item $driverZip
+          
+          # 查找解压后的chromedriver.exe
+          $chromedriver = Get-ChildItem -Path "drivers" -Filter "chromedriver.exe" -Recurse | Select-Object -First 1
+          if ($chromedriver) {
+            Move-Item -Path $chromedriver.FullName -Destination "drivers\chromedriver.exe" -Force
+            # 删除其他文件
+            Get-ChildItem -Path "drivers" -Exclude "chromedriver.exe" | Remove-Item -Recurse -Force
+            Write-Host "ChromeDriver下载完成: drivers\chromedriver.exe"
+          } else {
+            Write-Host "警告: 未找到chromedriver.exe"
+          }
+        } catch {
+          Write-Host "下载ChromeDriver失败: $_"
+          Write-Host "将尝试使用webdriver-manager作为备选方案"
+        }
+        
     - name: Build executable
       run: |
         pyinstaller --onefile `
@@ -52,6 +118,14 @@ jobs:
         # Copy necessary files
         Copy-Item species_db.json $packageDir\
         Copy-Item -Recurse templates $packageDir\templates
+        
+        # Copy ChromeDriver if exists
+        if (Test-Path "drivers\chromedriver.exe") {
+          Copy-Item drivers\chromedriver.exe $packageDir\
+          Write-Host "已包含ChromeDriver到安装包"
+        } else {
+          Write-Host "警告: ChromeDriver未找到，PNG功能可能需要网络连接"
+        }
         
         # Create 一键安装.bat
         $installScript = '@echo off' + "`n" +
