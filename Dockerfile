@@ -1,7 +1,7 @@
 # 使用Python 3.9作为基础镜像
 FROM python:3.9-slim
 
-# 配置国内镜像源加速
+# 配置国内镜像源加速（提升构建速度）
 RUN sed -i 's/deb.debian.org/mirrors.ustc.edu.cn/g' /etc/apt/sources.list.d/debian.sources 2>/dev/null || \
     (echo "deb https://mirrors.ustc.edu.cn/debian/ bookworm main" > /etc/apt/sources.list && \
      echo "deb https://mirrors.ustc.edu.cn/debian-security/ bookworm-security main" >> /etc/apt/sources.list && \
@@ -42,14 +42,15 @@ RUN wget -q --timeout=30 --tries=3 https://dl.google.com/linux/direct/google-chr
     rm -rf /var/lib/apt/lists/* || \
     echo "警告: Chrome安装失败"
 
-# 复制并安装ChromeDriver（从本地文件，支持离线部署）
+# 复制并安装ChromeDriver（使用本地zip文件，无需网络，支持完全离线部署）
 COPY chromedriver-linux64.zip /tmp/chromedriver.zip
 RUN unzip -q /tmp/chromedriver.zip -d /tmp && \
     mv /tmp/chromedriver-linux64/chromedriver /usr/local/bin/chromedriver && \
     chmod +x /usr/local/bin/chromedriver && \
     ln -sf /usr/local/bin/chromedriver /app/chromedriver && \
     rm -rf /tmp/chromedriver.zip /tmp/chromedriver-linux64 && \
-    chromedriver --version || echo "ChromeDriver安装完成"
+    chromedriver --version && \
+    echo "ChromeDriver安装成功，PNG功能可用"
 
 # 复制requirements文件
 COPY requirements.txt .

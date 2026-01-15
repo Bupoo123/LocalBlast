@@ -50,3 +50,10 @@ outputexcel/
 
 # Windows packaging
 LocalBlast_Windows*/
+LocalBlast_Windows_Installer*/
+
+# PyInstaller
+build/
+dist/
+*.spec
+*.exe
