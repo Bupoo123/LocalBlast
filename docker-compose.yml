@@ -1,0 +1,23 @@
+version: '3.8'
+
+services:
+  localblast:
+    build: .
+    container_name: localblast
+    ports:
+      - "5001:5001"
+    volumes:
+      # 持久化上传和结果文件
+      - ./uploads:/app/uploads
+      - ./results:/app/results
+      # 可选：挂载species_db.json以便更新
+      - ./species_db.json:/app/species_db.json
+    environment:
+      - PYTHONUNBUFFERED=1
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5001/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
