@@ -63,7 +63,7 @@ if getattr(sys, 'frozen', False):
     app = Flask(__name__, template_folder=template_folder)
 else:
     # 开发环境
-    app = Flask(__name__)
+app = Flask(__name__)
 CORS(app)
 
 # 配置（使用绝对路径，兼容PyInstaller打包）
@@ -262,6 +262,9 @@ def generate_html_result(query_sequence, subject_info, blast_results, is_best_ma
     query_id = f"{query_id_first_digit}{query_id_remaining}"
     
     subject_id = f"lcl|Query_{query_id} (dna)"
+    
+    # Query Descr 始终显示 None
+    query_description = 'None'
     
     # Subject Descr 始终显示 None provided
     subject_description = 'None provided'
@@ -580,6 +583,10 @@ def generate_html_result(query_sequence, subject_info, blast_results, is_best_ma
     <tr>
       <td class="label">Query Length</td>
       <td class="value">{query_length}</td>
+    </tr>
+    <tr>
+      <td class="label">Query Descr</td>
+      <td class="value">{query_description}</td>
     </tr>
     <tr>
       <td class="label">Subject ID</td>
@@ -950,7 +957,7 @@ def html_to_image(html_content, output_path, driver=None):
         # 创建临时HTML文件
         temp_html = output_path.replace('.png', '_temp.html')
         with open(temp_html, 'w', encoding='utf-8') as f:
-            f.write(html_content)
+        f.write(html_content)
         
         # 如果没有传入driver，创建新的（单文件处理模式）
         if not driver:
