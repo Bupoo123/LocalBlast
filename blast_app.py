@@ -63,7 +63,7 @@ if getattr(sys, 'frozen', False):
     app = Flask(__name__, template_folder=template_folder)
 else:
     # 开发环境
-app = Flask(__name__)
+    app = Flask(__name__)
 CORS(app)
 
 # 配置（使用绝对路径，兼容PyInstaller打包）
@@ -93,10 +93,25 @@ def load_species_db():
 def check_blast_installed():
     """检查BLAST+是否已安装"""
     try:
-        result = subprocess.run(['blastn', '-version'], 
+        # 尝试多个可能的路径
+        possible_paths = [
+            'blastn',  # 系统PATH中
+            '/opt/homebrew/bin/blastn',  # macOS Homebrew
+            '/usr/local/bin/blastn',  # 标准位置
+            '/usr/bin/blastn',  # Linux标准位置
+        ]
+        
+        for blastn_path in possible_paths:
+            try:
+                result = subprocess.run([blastn_path, '-version'], 
                               capture_output=True, text=True, timeout=5)
-        return result.returncode == 0
-    except (subprocess.TimeoutExpired, FileNotFoundError):
+                if result.returncode == 0:
+                    return True
+            except (subprocess.TimeoutExpired, FileNotFoundError):
+                continue
+        
+        return False
+    except Exception:
         return False
 
 def parse_blast_output(blast_output):
@@ -266,8 +281,8 @@ def generate_html_result(query_sequence, subject_info, blast_results, is_best_ma
     # Query Descr 始终显示 None
     query_description = 'None'
     
-    # Subject Descr 始终显示 None provided
-    subject_description = 'None provided'
+    # Subject Descr 始终显示 None（不包含provided）
+    subject_description = 'None'
     
     # 计算最佳匹配结果
     best_result = None
@@ -957,7 +972,7 @@ def html_to_image(html_content, output_path, driver=None):
         # 创建临时HTML文件
         temp_html = output_path.replace('.png', '_temp.html')
         with open(temp_html, 'w', encoding='utf-8') as f:
-        f.write(html_content)
+            f.write(html_content)
         
         # 如果没有传入driver，创建新的（单文件处理模式）
         if not driver:

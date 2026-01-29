@@ -36,7 +36,31 @@ echo ""
 
 # 检查BLAST+工具
 echo "[2/3] 检查BLAST+工具..."
-if ! command -v blastn &> /dev/null; then
+BLAST_FOUND=false
+BLAST_PATH=""
+
+# 尝试多个可能的路径
+POSSIBLE_PATHS=(
+    "blastn"  # 系统PATH中
+    "/opt/homebrew/bin/blastn"  # macOS Homebrew (Apple Silicon)
+    "/usr/local/bin/blastn"  # macOS Homebrew (Intel) 或标准位置
+    "/usr/bin/blastn"  # Linux标准位置
+)
+
+for blast_path in "${POSSIBLE_PATHS[@]}"; do
+    if command -v "$blast_path" &> /dev/null || [ -f "$blast_path" ]; then
+        if "$blast_path" -version &> /dev/null; then
+            BLAST_FOUND=true
+            BLAST_PATH="$blast_path"
+            BLAST_VERSION=$("$blast_path" -version 2>&1 | head -n 1)
+            echo "✅ 找到BLAST+: $BLAST_VERSION"
+            echo "   路径: $BLAST_PATH"
+            break
+        fi
+    fi
+done
+
+if [ "$BLAST_FOUND" = false ]; then
     echo "⚠️  警告: 未找到BLAST+工具"
     echo ""
     echo "请先安装BLAST+："
@@ -49,9 +73,6 @@ if ! command -v blastn &> /dev/null; then
     if [[ ! "$continue_choice" =~ ^[Yy]$ ]]; then
         exit 1
     fi
-else
-    BLAST_VERSION=$(blastn -version 2>&1 | head -n 1)
-    echo "✅ $BLAST_VERSION"
 fi
 echo ""
 
